@@ -48,16 +48,6 @@ void Model::Draw(Shader& shader) {
     }
 }
 
-// convert Assimp matrix to glm::mat4
-static glm::mat4 AiToGlm(const aiMatrix4x4& m) {
-    return glm::mat4(
-        m.a1, m.b1, m.c1, m.d1,
-        m.a2, m.b2, m.c2, m.d2,
-        m.a3, m.b3, m.c3, m.d3,
-        m.a4, m.b4, m.c4, m.d4
-    );
-}
-
 void Model::loadModel(const std::string& path) {
     // create Assimp importer
     Assimp::Importer importer;
@@ -67,7 +57,7 @@ void Model::loadModel(const std::string& path) {
         aiProcess_Triangulate           | // Ensures all faces are triangles
         aiProcess_GenNormals            | // Generates normals if missing
         aiProcess_JoinIdenticalVertices |  // Optimizes geometry
-        aiProcess_PreTransformVertices | // Bake node transforms into vertices
+        aiProcess_PreTransformVertices  | // Bake node transforms into vertices
         aiProcess_OptimizeMeshes; // Merge tiny meshes to reduce draw calls
 
     // import the 3D model file
@@ -193,6 +183,7 @@ std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
 
         vertices.push_back(vertex);
     }
+
     // process indices
     for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
         aiFace face = mesh->mFaces[i];
@@ -202,10 +193,10 @@ std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
     }
 
     // process textures
-    if (mesh->mMaterialIndex >= 0) {
+    /*if (mesh->mMaterialIndex >= 0) {
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         AttachEmbeddedTextures(textures, material, scene);
-    }
+    }*/
 
     // construct Mesh in place once and transfer ownership into Model
     return std::make_shared<Mesh>(vertices, indices, textures);
