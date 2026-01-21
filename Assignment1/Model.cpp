@@ -193,10 +193,10 @@ std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
     }
 
     // process textures
-    /*if (mesh->mMaterialIndex >= 0) {
+    if (mesh->mMaterialIndex >= 0) {
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         AttachEmbeddedTextures(textures, material, scene);
-    }*/
+    }
 
     // construct Mesh in place once and transfer ownership into Model
     return std::make_shared<Mesh>(vertices, indices, textures);
