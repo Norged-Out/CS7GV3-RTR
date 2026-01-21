@@ -22,7 +22,7 @@ public:
 	int height;
 
 	// Adjust the speed of the camera and it's sensitivity when looking around
-	float speed = 7.5f;
+	float speed = 2.5f;
 	float sensitivity = 0.1f;
 
 	// Euler angles (for stable yaw/pitch control)
@@ -50,7 +50,7 @@ public:
 	// Cinema orbit state
 	glm::vec3 orbitCenter{0.0f};
 	float orbitAngle = 0.0f;     // radians
-	float orbitSpeed = 0.12f;    // radians/sec (tweak)
+	float orbitSpeed = 0.25f;    // radians/sec (tweak)
 	float orbitRadius = 40.0f;   // will be recomputed from terrain size each frame
 	float orbitHeight = 15.0f;   // above mid terrain
 

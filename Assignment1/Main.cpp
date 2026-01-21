@@ -106,17 +106,45 @@ int main() {
     teapot.setScale(glm::vec3(0.05f));
     teapot.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 
+    // point camera at teapot
+    glm::vec3 target(0.0f, 0.0f, 0.0f);   // teapot at origin
+
+    camera.Position = glm::vec3(0.0f, 2.0f, 4.0f);   // back a bit, slightly up
+    glm::vec3 dir = glm::normalize(target - camera.Position);
+    camera.Orientation = dir;
+
+    // sync yaw/pitch
+    camera.pitch = glm::degrees(asin(dir.y));
+    camera.yaw = glm::degrees(atan2(dir.z, dir.x));
+
+
+    glm::vec3 bbMin = teapot.getAABBMin();
+    glm::vec3 bbMax = teapot.getAABBMax();
+
+    glm::vec3 centerXZ(
+        (bbMin.x + bbMax.x) * 0.0f,
+        (bbMin.y + bbMax.y) * 0.0f,
+        (bbMin.z + bbMax.z) * 0.5f
+    );
+
+
 
     // ------------ Render Loop ------------
     float prevTime = (float)glfwGetTime();
-
+	bool pWasDown = false;
     // this loop will run until we close window
     while (!glfwWindowShouldClose(window)) {
         float now = (float)glfwGetTime();
         float dt = now - prevTime;
         prevTime = now;
 
-		camera.Inputs(window, dt);
+        bool pDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+        if (pDown && !pWasDown) {
+            camera.ToggleCinema(bbMin);
+        }
+        pWasDown = pDown;
+
+        camera.UpdateWithMode(window, dt);
 
         // Updates and exports the camera matrix to the Vertex Shader
         camera.updateMatrix(0.5f, 100.0f);
