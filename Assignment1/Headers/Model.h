@@ -8,23 +8,30 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp> 
 #include "Mesh.h"
 class Shader;
 
 class Model
 {
 public:
-    // optional root transform
-    glm::mat4 modelMatrix = glm::mat4(1.0f);
-
     // double constructors
     explicit Model(const std::string& path);
     Model(const std::string& path, const std::vector<std::string>& skipNames);
+    // Prevent copying
+    Model(const Model&) = delete;
+    Model& operator=(const Model&) = delete;
 
     // simple setters for TRS
     void setPosition(const glm::vec3& pos);
     void setRotation(float angleDeg, const glm::vec3& axis);
     void setScale(const glm::vec3& s);
+
+	glm::mat4 getModelMatrix() const {
+        return glm::translate(glm::mat4(1.0f), position)
+            * glm::mat4_cast(rotation)
+            * glm::scale(glm::mat4(1.0f), scale);
+    }
 
     // axis-aligned bounding box (model space)
     glm::vec3 getAABBMin() const { return aabbMin; }
@@ -36,6 +43,11 @@ public:
     void Draw(Shader& shader);
 
 private:
+    // local transform
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // Identity quaternion
+    glm::vec3 scale = glm::vec3(1.0f);
+
     // model space bounds
     glm::vec3 aabbMin = glm::vec3(std::numeric_limits<float>::max());
     glm::vec3 aabbMax = glm::vec3(-std::numeric_limits<float>::max());

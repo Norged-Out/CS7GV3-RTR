@@ -140,7 +140,7 @@ int main() {
 
         bool pDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
         if (pDown && !pWasDown) {
-            camera.ToggleCinema(bbMin);
+            camera.ToggleCinema(target);
         }
         pWasDown = pDown;
 

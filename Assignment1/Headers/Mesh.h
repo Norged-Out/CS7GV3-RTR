@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector> 
+#include <memory>
 #include <glad/glad.h> 
 #include <glm/glm.hpp> 
 #include "VBO.h"
@@ -14,7 +15,7 @@ class Mesh
 public:
 	std::vector <Vertex> vertices;
 	std::vector <GLuint> indices;
-	std::vector <Texture> textures;
+	std::vector<std::shared_ptr<Texture>> textures;
 	// Store model matrix for simple transformations
 	glm::mat4 modelMatrix = glm::mat4(1.0f);
 	GLenum drawMode = GL_TRIANGLES; // default, but can be changed per mesh
@@ -22,7 +23,7 @@ public:
 	// Initializes the mesh
 	Mesh(const std::vector <Vertex>& vertices,
 		 const std::vector <GLuint>& indices,
-		 const std::vector <Texture>& textures);
+		 const std::vector<std::shared_ptr<Texture>>& textures);
 
 	// simple helpers
 	void setModelMatrix(const glm::mat4& m);

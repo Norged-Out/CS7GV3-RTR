@@ -10,6 +10,13 @@ public:
 	GLuint ID;
 	// Constructor that generates a VAO ID
 	VAO();
+	// Destructor to clean up
+	~VAO() {
+		if (ID != 0) Delete();
+	}
+	// Prevent copying
+	VAO(const VAO&) = delete;
+	VAO& operator=(const VAO&) = delete;
 
 	// Links a VBO to the VAO using a certain layout for float attributes
 	void LinkVBO(VBO& VBO, GLuint layout, GLint numComponents, GLsizei stride, const void* offset);

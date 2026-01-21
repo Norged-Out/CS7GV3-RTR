@@ -19,28 +19,22 @@ Model::Model(const std::string& path, const std::vector<std::string>& skipNames)
     loadModel(path);
 }
 
-void Model::setPosition(const glm::vec3& pos) {
-    // overwrite translation component, preserve existing rotation/scale
-    modelMatrix[3] = glm::vec4(pos, 1.0f);
-}
+void Model::setPosition(const glm::vec3& pos) { position = pos; }
 
 void Model::setRotation(float angleDeg, const glm::vec3& axis) {
-    // apply rotation on top of current matrix
-    modelMatrix = glm::rotate(modelMatrix, glm::radians(angleDeg), axis);
+    rotation = glm::angleAxis(glm::radians(angleDeg), glm::normalize(axis));
 }
 
-void Model::setScale(const glm::vec3& s) {
-    // apply scale on top of current matrix
-    modelMatrix = glm::scale(modelMatrix, s);
-}
+void Model::setScale(const glm::vec3& s) { scale = s; }
 
 
 void Model::Draw(Shader& shader) {
     if (meshes.empty()) return; // guard
+    glm::mat4 computedMatrix = getModelMatrix();  // Compute TRS from components
     // draws each mesh onto scene
     for (auto& mesh : meshes) {
         // combine model transform with mesh
-        glm::mat4 finalMatrix = modelMatrix * mesh->getModelMatrix();
+        glm::mat4 finalMatrix = computedMatrix * mesh->getModelMatrix();
         // export the finalMatrix to the Vertex Shader of model
         shader.setMat4("model", finalMatrix);
         // issue the actual draw for this mesh
@@ -115,7 +109,7 @@ void Model::processNode(aiNode* node, const aiScene* scene) {
     }
 }
 
-static void AttachEmbeddedTextures(std::vector<Texture>& textures,
+static void AttachEmbeddedTextures(std::vector<std::shared_ptr<Texture>>& textures,
     aiMaterial* material, const aiScene* scene) {
     aiString texPath;
     bool attached = false;
@@ -135,9 +129,9 @@ static void AttachEmbeddedTextures(std::vector<Texture>& textures,
                 const unsigned char* bytes = reinterpret_cast<const unsigned char*>(tex->pcData);
                 size_t size = tex->mWidth; // byte size when compressed
                 // diffuse0 on texture unit 0
-                textures.emplace_back(bytes, size, "diffuse", 0, GL_UNSIGNED_BYTE);
+                textures.emplace_back(std::make_shared<Texture>(bytes, size, "diffuse", 0, GL_UNSIGNED_BYTE));
                 // specular0 on texture unit 1 (simple mirror so shader has something bound)
-                textures.emplace_back(bytes, size, "specular", 1, GL_UNSIGNED_BYTE);
+                textures.emplace_back(std::make_shared<Texture>(bytes, size, "specular", 1, GL_UNSIGNED_BYTE));
                 return true;
             }
 
@@ -157,7 +151,7 @@ static void AttachEmbeddedTextures(std::vector<Texture>& textures,
 std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
     std::vector<Vertex> vertices;
     std::vector<GLuint> indices;
-    std::vector<Texture> textures;
+    std::vector<std::shared_ptr<Texture>> textures;
 
     // extract vertex data
     for (unsigned int i = 0; i < mesh->mNumVertices; i++) {

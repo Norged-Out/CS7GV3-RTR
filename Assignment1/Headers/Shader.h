@@ -31,6 +31,14 @@ public:
 	//void setVec4(const std::string& name, float x, float y, float z, float w) const;
 	void setVec4(const std::string& name, const glm::vec4& v) const;
 
+	~Shader() {
+		if (ID != 0) Delete();
+	}
+
+	// Prevent copying (avoid double-delete)
+	Shader(const Shader&) = delete;
+	Shader& operator=(const Shader&) = delete;
+
 private:
 	// cache of uniform locations to reduce calls
 	mutable std::unordered_map<std::string, GLint> uniformCache;

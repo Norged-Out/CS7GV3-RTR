@@ -6,7 +6,7 @@
 // Constructor that generates a Mesh, need to initialze vbo and ebo
 Mesh::Mesh(const std::vector <Vertex>& vert, 
 			const std::vector <GLuint>& inds, 
-			const std::vector <Texture>& texs)
+			const std::vector<std::shared_ptr<Texture>>& texs)
 	: vertices(vert), indices(inds), textures(texs), vbo(vertices), ebo(indices) {
 	// bind vao since default constructor is already called
 	vao.Bind();
@@ -57,15 +57,15 @@ void Mesh::Draw(Shader& shader) {
 	// bind textures in order
 	for (unsigned int i = 0; i < textures.size(); i++) {
 		std::string num;
-		std::string type = textures[i].type;
+		std::string type = textures[i]->type;
 		if (type == "diffuse") {
 			num = std::to_string(numDiffuse++);
 		}
 		else if (type == "specular") {
 			num = std::to_string(numSpecular++);
 		}
-		textures[i].texUnit(shader, (type + num).c_str(), i);
-		textures[i].Bind();
+		textures[i]->texUnit(shader, (type + num).c_str(), i);
+		textures[i]->Bind();
 	}
 
 	// Draw the actual mesh

@@ -10,6 +10,14 @@ public:
 	GLuint ID;
 	// Constructor that generates a Elements Buffer Object and links it to indices
 	EBO(const std::vector<GLuint>& indices);
+	// Destructor
+	~EBO() {
+		if (ID != 0) Delete();
+	}
+
+	// Prevent copying
+	EBO(const EBO&) = delete;
+	EBO& operator=(const EBO&) = delete;
 
 	// Binds the EBO
 	void Bind();
