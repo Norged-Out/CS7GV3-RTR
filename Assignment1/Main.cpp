@@ -92,9 +92,17 @@ int main() {
     shaderProgram.Activate();
     shaderProgram.setInt("diffuse0", 0);
     shaderProgram.setInt("specular0", 1);
-    // basic lighting
+
+    // Lighting
     shaderProgram.setVec4("lightColor", glm::vec4(1.0f, 0.97f, 0.92f, 1.0f));
-    shaderProgram.setVec3("lightPos", glm::vec3(1.0f, 4.0f, 5.0f));
+    shaderProgram.setVec3("lightDir", glm::normalize(glm::vec3(0.5f, 1.0f, 0.8f)));  // Directional light
+
+    // Material properties
+    shaderProgram.setFloat("ambient", 0.23f);
+    shaderProgram.setFloat("specularStr", 0.5f);
+    shaderProgram.setFloat("shininess", 16.0f);
+    shaderProgram.setFloat("uvScale", 1.0f);
+
 
 
 	// attempt to load teapot model
@@ -148,6 +156,8 @@ int main() {
 
         // Updates and exports the camera matrix to the Vertex Shader
         camera.updateMatrix(0.5f, 100.0f);
+        shaderProgram.Activate();
+        shaderProgram.setVec3("camPos", camera.Position);
 		camera.Matrix(shaderProgram, "camMatrix");
 
         // clear the screen and specify background color
