@@ -83,7 +83,7 @@ void Camera::Inputs(GLFWwindow* window, float dt) {
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) FOV = defaultFOV;
 
 	// Handles mouse inputs
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
 		// Hides mouse cursor
 		if (!mouseCaptured) {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // hides + centers internally

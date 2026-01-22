@@ -22,7 +22,7 @@ uniform float shininess; // Shininess factor
 uniform vec3 camPos; // Gets the position of the camera
 
 
-vec4 directLight() {
+vec4 pointLight() {
     // Lighting Vectors
     vec3 N = normalize(normalWS);
     vec3 L = normalize(lightPos - currPos);
@@ -54,5 +54,5 @@ vec4 directLight() {
 
 
 void main() {
-	fragColor = directLight();
+	fragColor = pointLight();
 }

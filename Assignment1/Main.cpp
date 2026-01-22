@@ -5,6 +5,13 @@
 #include "Model.h"
 #include "Shader.h"
 
+
+// imgui
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
+
 // -------------------- Establish globals --------------------
 
 const unsigned int width = 1200;
@@ -87,22 +94,30 @@ int main() {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
 
+
+    // Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
+
+	// ------------ Load Assets ------------
+
     // setup shaders
     Shader shaderProgram("Shaders/scene.vert", "Shaders/scene.frag");
     shaderProgram.Activate();
     shaderProgram.setInt("diffuse0", 0);
     shaderProgram.setInt("specular0", 1);
 
-    // Lighting
-    shaderProgram.setVec4("lightColor", glm::vec4(1.0f, 0.97f, 0.92f, 1.0f));
-    shaderProgram.setVec3("lightPos", glm::vec3(0.0f, 2.0f, 3.0f));
-
-    // Material properties
-    shaderProgram.setFloat("ambient", 0.5f);
-    shaderProgram.setFloat("specularStr", 0.5f);
-    shaderProgram.setFloat("shininess", 16.0f);
-    shaderProgram.setFloat("uvScale", 1.0f);
-
+    // UI-controlled lighting parameters
+    float ambient = 0.4f;
+    float specularStr = 0.5f;
+    float shininess = 32.0f;
+    glm::vec3 lightPos = glm::vec3(0.0f, 3.0f, 4.0f);
+    glm::vec4 lightColor = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
 
 
 	// attempt to load teapot model
@@ -128,17 +143,6 @@ int main() {
     camera.yaw = glm::degrees(atan2(dir.z, dir.x));
 
 
-    glm::vec3 bbMin = teapot.getAABBMin();
-    glm::vec3 bbMax = teapot.getAABBMax();
-
-    glm::vec3 centerXZ(
-        (bbMin.x + bbMax.x) * 0.0f,
-        (bbMin.y + bbMax.y) * 0.0f,
-        (bbMin.z + bbMax.z) * 0.5f
-    );
-
-
-
     // ------------ Render Loop ------------
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = false;
@@ -148,6 +152,29 @@ int main() {
         float dt = now - prevTime;
         prevTime = now;
 
+        // Start ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // ImGui UI Window
+        ImGui::Begin("Lighting Controls");
+        ImGui::Text("Adjust lighting parameters:");
+        ImGui::Separator();
+        ImGui::SliderFloat("Ambient", &ambient, 0.0f, 1.0f);
+        ImGui::SliderFloat("Specular Strength", &specularStr, 0.0f, 2.0f);
+        ImGui::SliderFloat("Shininess", &shininess, 1.0f, 128.0f);
+        ImGui::Separator();
+        ImGui::ColorEdit3("Light Color", &lightColor.r);
+        ImGui::DragFloat3("Light Position", &lightPos.x, 0.1f);
+        ImGui::End();
+
+        // clear the screen and specify background color
+        glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
+        // clean back buffer and depth buffer
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// Handle camera inputs
         bool pDown = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
         if (pDown && !pWasDown) {
             camera.ToggleCinema(target);
@@ -162,12 +189,19 @@ int main() {
         shaderProgram.setVec3("camPos", camera.Position);
 		camera.Matrix(shaderProgram, "camMatrix");
 
-        // clear the screen and specify background color
-        glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
-        // clean back buffer and depth buffer
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		// set lighting uniforms
+        shaderProgram.setVec4("lightColor", lightColor);
+        shaderProgram.setVec3("lightPos", lightPos);
+        shaderProgram.setFloat("ambient", ambient);
+        shaderProgram.setFloat("specularStr", specularStr);
+        shaderProgram.setFloat("shininess", shininess);
+     
+        // draw teapot
         teapot.Draw(shaderProgram);
+
+        // Render ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // unbind the VAO
         glBindVertexArray(0);
@@ -180,8 +214,12 @@ int main() {
 
     // ------------ Clean up ------------
 
+    // Cleanup ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+	// delete shader program
 	shaderProgram.Delete();
-
     // deletes window before ending program
     glfwDestroyWindow(window);
     // terminate GLFW before ending program
