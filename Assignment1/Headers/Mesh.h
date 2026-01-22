@@ -25,6 +25,12 @@ public:
 		 const std::vector <GLuint>& indices,
 		 const std::vector<std::shared_ptr<Texture>>& textures);
 
+	~Mesh() {
+		vao.Delete();
+		vbo.Delete();
+		ebo.Delete();
+	}
+
 	// simple helpers
 	void setModelMatrix(const glm::mat4& m);
 	const glm::mat4& getModelMatrix() const;

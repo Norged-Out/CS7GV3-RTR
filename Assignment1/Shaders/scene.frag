@@ -12,7 +12,7 @@ uniform sampler2D specular0; // texture unit for specular
 uniform float uvScale = 1.0;
 
 uniform vec4 lightColor; // Gets the color of the light
-uniform vec3 lightDir;   // Gets the direction of the light
+uniform vec3 lightPos;   // Gets the position of the light
 
 uniform float ambient; // Ambient strength
 uniform float specularStr; // Specular strength
@@ -25,9 +25,13 @@ uniform vec3 camPos; // Gets the position of the camera
 vec4 directLight() {
     // Lighting Vectors
     vec3 N = normalize(normalWS);
-    vec3 L = normalize(lightDir);
+    vec3 L = normalize(lightPos - currPos);
     vec3 V = normalize(camPos - currPos);
     vec3 H = normalize(L + V);  // Halfway vector for Blinn-Phong
+
+    // Attenuation
+    float distance = length(lightPos - currPos);
+    float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
     
     // Diffuse
     float diffuse = max(dot(N, L), 0.0);
@@ -41,7 +45,11 @@ vec4 directLight() {
     float specularMap = texture(specular0, texCoord * uvScale).r;
     
     // Combine
-    return (diffuseColor * (ambient + diffuse) + specularMap * specular) * lightColor;
+    vec3 result = (diffuseColor.rgb * (ambient + diffuse) + specularMap * specular) * lightColor.rgb;
+
+    result *= attenuation;  // Apply distance falloff
+
+    return vec4(result, diffuseColor.a);
 }
 
 

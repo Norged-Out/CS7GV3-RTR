@@ -95,10 +95,10 @@ int main() {
 
     // Lighting
     shaderProgram.setVec4("lightColor", glm::vec4(1.0f, 0.97f, 0.92f, 1.0f));
-    shaderProgram.setVec3("lightDir", glm::normalize(glm::vec3(0.5f, 1.0f, 0.8f)));  // Directional light
+    shaderProgram.setVec3("lightPos", glm::vec3(0.0f, 2.0f, 3.0f));
 
     // Material properties
-    shaderProgram.setFloat("ambient", 0.23f);
+    shaderProgram.setFloat("ambient", 0.5f);
     shaderProgram.setFloat("specularStr", 0.5f);
     shaderProgram.setFloat("shininess", 16.0f);
     shaderProgram.setFloat("uvScale", 1.0f);
@@ -107,11 +107,13 @@ int main() {
 
 	// attempt to load teapot model
     float t0 = (float)glfwGetTime();
-	Model teapot("Models/japanese_teapot.glb");
+	Model teapot("Models/clay-teapot/teapot.fbx",
+                 "Models/clay-teapot/teapot_BaseColor.png",
+                 "Models/clay-teapot/teapot_Roughness.png");
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] teapot took " << (t1 - t0) << "s\n";
 
-    teapot.setScale(glm::vec3(0.05f));
+    teapot.setScale(glm::vec3(0.01f));
     teapot.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 
     // point camera at teapot

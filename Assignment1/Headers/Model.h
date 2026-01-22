@@ -15,9 +15,11 @@ class Shader;
 class Model
 {
 public:
-    // double constructors
+    // constructors
     explicit Model(const std::string& path);
     Model(const std::string& path, const std::vector<std::string>& skipNames);
+    Model(const std::string& path, const std::string& diffusePath = "", const std::string& specularPath = "");
+
     // Prevent copying
     Model(const Model&) = delete;
     Model& operator=(const Model&) = delete;
@@ -54,6 +56,8 @@ private:
 
 	// the shared asset data
     std::vector<std::shared_ptr<Mesh>> meshes;
+    std::string diffusePath;
+    std::string specularPath;
 
     // Skip some unwanted meshes
     std::vector<std::string> meshNameSkips;
@@ -63,4 +67,6 @@ private:
     void loadModel(const std::string& path);
     void processNode(aiNode* node, const aiScene* scene);
     std::shared_ptr<Mesh> processMesh(aiMesh* mesh, const aiScene* scene);
+    void AttachTextures(std::vector<std::shared_ptr<Texture>>& textures,
+        aiMaterial* material, const aiScene* scene);
 };

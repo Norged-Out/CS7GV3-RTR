@@ -8,6 +8,16 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+
+// helper to extract model path
+static std::string getModelDirectory(const std::string& modelPath) {
+    size_t lastSlash = modelPath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        return modelPath.substr(0, lastSlash + 1);
+    }
+    return "";  // Model in current directory
+}
+
 // Constructor to load model
 Model::Model(const std::string& path) {
     loadModel(path);
@@ -18,6 +28,15 @@ Model::Model(const std::string& path, const std::vector<std::string>& skipNames)
     : meshNameSkips(skipNames){
     loadModel(path);
 }
+
+// alt Constructor to force diffuse/specular textures
+Model::Model(const std::string& path,
+    const std::string& diffusePath,
+    const std::string& specularPath)
+    : diffusePath(diffusePath), specularPath(specularPath) {
+    loadModel(path);
+}
+
 
 void Model::setPosition(const glm::vec3& pos) { position = pos; }
 
@@ -109,43 +128,78 @@ void Model::processNode(aiNode* node, const aiScene* scene) {
     }
 }
 
-static void AttachEmbeddedTextures(std::vector<std::shared_ptr<Texture>>& textures,
+void Model::AttachTextures(std::vector<std::shared_ptr<Texture>>& textures,
     aiMaterial* material, const aiScene* scene) {
-    aiString texPath;
-    bool attached = false;
 
-    auto attach = [&](aiTextureType t) {
-        if (material->GetTextureCount(t) == 0) return false;
-        if (material->GetTexture(t, 0, &texPath) != AI_SUCCESS) return false;
+    // try Embedded textures first
+    auto loadTexture = [&](aiTextureType aiType, const char* typeName, GLuint slot) -> bool {
+        if (material->GetTextureCount(aiType) == 0) return false;
 
-        // Embedded textures have paths like "*0"
+        aiString texPath;
+        if (material->GetTexture(aiType, 0, &texPath) != AI_SUCCESS) return false;
+        std::cout << "[DEBUG] Raw texture path: \"" << texPath.C_Str() << "\"\n";
+
+        // Embedded texture 
         if (texPath.length > 0 && texPath.C_Str()[0] == '*') {
             int idx = std::atoi(texPath.C_Str() + 1);
-            const aiTexture* tex = scene->mTextures[idx];
-            if (!tex) return false;
+            if (idx >= 0 && idx < (int)scene->mNumTextures) {
+                const aiTexture* tex = scene->mTextures[idx];
+                if (!tex) return false;
 
-            // Common GLB case: compressed image data (mHeight == 0)
-            if (tex->mHeight == 0) {
-                const unsigned char* bytes = reinterpret_cast<const unsigned char*>(tex->pcData);
-                size_t size = tex->mWidth; // byte size when compressed
-                // diffuse0 on texture unit 0
-                textures.emplace_back(std::make_shared<Texture>(bytes, size, "diffuse", 0, GL_UNSIGNED_BYTE));
-                // specular0 on texture unit 1 (simple mirror so shader has something bound)
-                textures.emplace_back(std::make_shared<Texture>(bytes, size, "specular", 1, GL_UNSIGNED_BYTE));
-                return true;
+                // Compressed embedded texture (GLB case)
+                if (tex->mHeight == 0) {
+                    const unsigned char* bytes = reinterpret_cast<const unsigned char*>(tex->pcData);
+                    size_t size = tex->mWidth;
+                    textures.emplace_back(std::make_shared<Texture>(bytes, size, typeName, slot, GL_UNSIGNED_BYTE));
+                    std::cout << "[Texture] Loaded embedded " << typeName << "\n";
+                    return true;
+                }
             }
-
-            // If it's uncompressed BGRA (mHeight != 0), skip for now
-            return false;
         }
-
-        // External file case (rare for .glb) — you can wire later if you want
         return false;
         };
 
-    // Try BASE_COLOR first, then DIFFUSE
-    attached = attach(aiTextureType_BASE_COLOR) || attach(aiTextureType_DIFFUSE);
+    // Try to load diffuse texture (slot 0)
+    bool hasDiffuse = loadTexture(aiTextureType_BASE_COLOR, "diffuse", 0) ||
+                      loadTexture(aiTextureType_DIFFUSE, "diffuse", 0);
+
+    // Try to load specular texture (slot 1)
+    bool hasSpecular = loadTexture(aiTextureType_SPECULAR, "specular", 1);
+
+	// attempt manual override paths if provided
+    if (!hasDiffuse && !diffusePath.empty()) {
+        try {
+            textures.emplace_back(std::make_shared<Texture>(
+                diffusePath.c_str(), "diffuse", 0, GL_UNSIGNED_BYTE));
+            std::cout << "[Texture] Loaded manual diffuse: " << diffusePath << "\n";
+            hasDiffuse = true;
+        }
+        catch (...) {
+            std::cerr << "[Texture] Failed to load manual diffuse\n";
+        }
+    }
+
+    if (!hasSpecular && !specularPath.empty()) {
+        try {
+            textures.emplace_back(std::make_shared<Texture>(
+                specularPath.c_str(), "specular", 1, GL_UNSIGNED_BYTE));
+            std::cout << "[Texture] Loaded manual specular: " << specularPath << "\n";
+            hasSpecular = true;
+        }
+        catch (...) {
+            std::cerr << "[Texture] Failed to load manual specular\n";
+        }
+    }
+
+
+    if (!hasDiffuse) {
+        std::cout << "[Texture] Warning: No diffuse texture found\n";
+    }
+    if (!hasSpecular) {
+        std::cout << "[Texture] Note: No specular texture found\n";
+    }
 }
+
 
 
 std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
@@ -189,7 +243,7 @@ std::shared_ptr<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
     // process textures
     if (mesh->mMaterialIndex >= 0) {
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-        AttachEmbeddedTextures(textures, material, scene);
+        AttachTextures(textures, material, scene);
     }
 
     // construct Mesh in place once and transfer ownership into Model
