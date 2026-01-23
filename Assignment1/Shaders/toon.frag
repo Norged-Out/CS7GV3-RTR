@@ -29,7 +29,7 @@ void main() {
     vec3 N = normalize(normalWS);
     vec3 L = normalize(lightPos - currPos);
     vec3 V = normalize(camPos - currPos);
-    vec3 H = normalize(L + V);  // Halfway vector for Blinn-Phong
+    vec3 H = normalize(L + V);  // Halfway vector
 
     // Attenuation
     float distance = length(lightPos - currPos);
