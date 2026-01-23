@@ -17,12 +17,12 @@ uniform vec3 lightPos;   // Gets the position of the light
 uniform float ambient; // Ambient strength
 uniform float specularStr; // Specular strength
 uniform float shininess; // Shininess factor
-
+uniform int toonLevels;  // Number of toon shading bands
 
 uniform vec3 camPos; // Gets the position of the camera
 
 
-vec4 pointLight() {
+void main() {
     // Lighting Vectors
     vec3 N = normalize(normalWS);
     vec3 L = normalize(lightPos - currPos);
@@ -33,12 +33,15 @@ vec4 pointLight() {
     float distance = length(lightPos - currPos);
     float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
     
-    // Diffuse
-    float diffuse = max(dot(N, L), 0.0);
+    // Diffuse (quantize into discrete bands)
+    float diffuseIntensity = max(dot(N, L), 0.0); 
+    float levels = float(toonLevels);
+    float diffuse = floor(diffuseIntensity * levels) / levels;
     
-    // Specular (Blinn-Phong using halfway vector)
+    // Specular (highlights must be 'painted')
     float spec = pow(max(dot(N, H), 0.0), shininess);
-    float specular = specularStr * spec;
+    float specular = 0.0; // default to no highlights
+    if (spec > 0.5) specular = 1.0; // hard cutoff for toon effect
     
     // Sample textures
     vec4 diffuseColor = texture(diffuse0, texCoord * uvScale);
@@ -49,10 +52,5 @@ vec4 pointLight() {
 
     result *= attenuation;  // Apply distance falloff
 
-    return vec4(result, diffuseColor.a);
-}
-
-
-void main() {
-	fragColor = pointLight();
+    fragColor = vec4(result, diffuseColor.a);
 }

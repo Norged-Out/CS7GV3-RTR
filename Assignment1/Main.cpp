@@ -107,29 +107,52 @@ int main() {
 	// ------------ Load Assets ------------
 
     // setup shaders
-    Shader shaderProgram("Shaders/scene.vert", "Shaders/scene.frag");
-    shaderProgram.Activate();
-    shaderProgram.setInt("diffuse0", 0);
-    shaderProgram.setInt("specular0", 1);
+    Shader blinnPhongShader("Shaders/scene.vert", "Shaders/blinnPhong.frag");
+    blinnPhongShader.Activate();
+    blinnPhongShader.setInt("diffuse0", 0);
+    blinnPhongShader.setInt("specular0", 1);
+
+	Shader toonShader("Shaders/scene.vert", "Shaders/toon.frag");
+	toonShader.Activate();
+	toonShader.setInt("diffuse0", 0);
+	toonShader.setInt("specular0", 1);
 
     // UI-controlled lighting parameters
     float ambient = 0.4f;
     float specularStr = 0.5f;
     float shininess = 32.0f;
+    int toonLevels = 3;
     glm::vec3 lightPos = glm::vec3(0.0f, 3.0f, 4.0f);
     glm::vec4 lightColor = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
 
 
 	// attempt to load teapot model
     float t0 = (float)glfwGetTime();
-	Model teapot("Models/clay-teapot/teapot.fbx",
-                 "Models/clay-teapot/teapot_BaseColor.png",
-                 "Models/clay-teapot/teapot_Roughness.png");
+	Model teapot1("Models/clay-teapot/teapot.fbx",
+                  "Models/clay-teapot/teapot_BaseColor.png",
+                  "Models/clay-teapot/teapot_Roughness.png");
+    Model teapot2("Models/clay-teapot/teapot.fbx",
+                  "Models/clay-teapot/teapot_BaseColor.png",
+                  "Models/clay-teapot/teapot_Roughness.png");
+    Model teapot3("Models/clay-teapot/teapot.fbx",
+                  "Models/clay-teapot/teapot_BaseColor.png",
+                  "Models/clay-teapot/teapot_Roughness.png");
     float t1 = (float)glfwGetTime();
-    std::cout << "[Load] teapot took " << (t1 - t0) << "s\n";
+    std::cout << "[Load] teapots took " << (t1 - t0) << "s\n";
 
-    teapot.setScale(glm::vec3(0.01f));
-    teapot.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    
+    // Teapot 1 - Center (Blinn-Phong)
+    teapot1.setScale(glm::vec3(0.01f));
+    teapot1.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    // Teapot 2 - Left (Toon)
+    teapot2.setScale(glm::vec3(0.01f));
+    teapot2.setPosition(glm::vec3(-4.0f, 0.0f, 0.0f));
+
+    // Teapot 3 - Right (PBR)
+    teapot3.setScale(glm::vec3(0.01f));
+    teapot3.setPosition(glm::vec3(4.0f, 0.0f, 0.0f));
+
 
     // point camera at teapot
     glm::vec3 target(0.0f, 0.0f, 0.0f);   // teapot at origin
@@ -146,11 +169,14 @@ int main() {
     // ------------ Render Loop ------------
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = false;
+    float rotationSpeed = 20.0f;
+	float angle = 0.0f;
     // this loop will run until we close window
     while (!glfwWindowShouldClose(window)) {
         float now = (float)glfwGetTime();
         float dt = now - prevTime;
         prevTime = now;
+        angle = now * rotationSpeed;
 
         // Start ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -164,6 +190,7 @@ int main() {
         ImGui::SliderFloat("Ambient", &ambient, 0.0f, 1.0f);
         ImGui::SliderFloat("Specular Strength", &specularStr, 0.0f, 2.0f);
         ImGui::SliderFloat("Shininess", &shininess, 1.0f, 128.0f);
+        ImGui::SliderInt("Toon Levels", &toonLevels, 2, 5);
         ImGui::Separator();
         ImGui::ColorEdit3("Light Color", &lightColor.r);
         ImGui::DragFloat3("Light Position", &lightPos.x, 0.1f);
@@ -184,20 +211,39 @@ int main() {
         camera.UpdateWithMode(window, dt);
 
         // Updates and exports the camera matrix to the Vertex Shader
-        camera.updateMatrix(0.5f, 100.0f);
-        shaderProgram.Activate();
-        shaderProgram.setVec3("camPos", camera.Position);
-		camera.Matrix(shaderProgram, "camMatrix");
-
-		// set lighting uniforms
-        shaderProgram.setVec4("lightColor", lightColor);
-        shaderProgram.setVec3("lightPos", lightPos);
-        shaderProgram.setFloat("ambient", ambient);
-        shaderProgram.setFloat("specularStr", specularStr);
-        shaderProgram.setFloat("shininess", shininess);
+        camera.updateMatrix(0.5f, 100.0f);       
      
-        // draw teapot
-        teapot.Draw(shaderProgram);
+		// draw teapot 1 (Blinn-Phong)
+        blinnPhongShader.Activate();
+        camera.Matrix(blinnPhongShader, "camMatrix");
+        blinnPhongShader.setVec3("camPos", camera.Position);
+        blinnPhongShader.setVec4("lightColor", lightColor);
+        blinnPhongShader.setVec3("lightPos", lightPos);
+        blinnPhongShader.setFloat("ambient", ambient);
+        blinnPhongShader.setFloat("specularStr", specularStr);
+        blinnPhongShader.setFloat("shininess", shininess);
+        teapot1.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        teapot1.Draw(blinnPhongShader);
+
+		// draw teapot 2 (Toon)
+		toonShader.Activate();
+		camera.Matrix(toonShader, "camMatrix");
+		toonShader.setVec3("camPos", camera.Position);
+		toonShader.setVec4("lightColor", lightColor);
+		toonShader.setVec3("lightPos", lightPos);
+		toonShader.setFloat("ambient", ambient);
+		toonShader.setFloat("specularStr", specularStr);
+		toonShader.setFloat("shininess", shininess);
+		toonShader.setInt("toonLevels", toonLevels);
+        teapot2.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        teapot2.Draw(toonShader);
+
+
+        
+		teapot3.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+        
+		
+		teapot3.Draw(blinnPhongShader);
 
         // Render ImGui
         ImGui::Render();
@@ -219,7 +265,7 @@ int main() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 	// delete shader program
-	shaderProgram.Delete();
+    blinnPhongShader.Delete();
     // deletes window before ending program
     glfwDestroyWindow(window);
     // terminate GLFW before ending program
