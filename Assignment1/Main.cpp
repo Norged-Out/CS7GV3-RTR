@@ -117,11 +117,18 @@ int main() {
 	toonShader.setInt("diffuse0", 0);
 	toonShader.setInt("specular0", 1);
 
+	Shader cookTorranceShader("Shaders/scene.vert", "Shaders/cookTorrance.frag");
+	cookTorranceShader.Activate();
+	cookTorranceShader.setInt("diffuse0", 0);
+	cookTorranceShader.setInt("specular0", 1);
+
     // UI-controlled lighting parameters
     float ambient = 0.4f;
     float specularStr = 0.5f;
     float shininess = 32.0f;
     int toonLevels = 3;
+    bool enableRim = false;
+    float rimStrength = 0.3f;
     glm::vec3 lightPos = glm::vec3(0.0f, 3.0f, 4.0f);
     glm::vec4 lightColor = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
 
@@ -190,8 +197,10 @@ int main() {
         ImGui::SliderFloat("Ambient", &ambient, 0.0f, 1.0f);
         ImGui::SliderFloat("Specular Strength", &specularStr, 0.0f, 2.0f);
         ImGui::SliderFloat("Shininess", &shininess, 1.0f, 128.0f);
-        ImGui::SliderInt("Toon Levels", &toonLevels, 2, 5);
         ImGui::Separator();
+        ImGui::SliderInt("Toon Levels", &toonLevels, 2, 5);
+        ImGui::Checkbox("Enable Rim Lighting", &enableRim);
+        ImGui::SliderFloat("Rim Strength", &rimStrength, 0.0f, 1.0f);
         ImGui::ColorEdit3("Light Color", &lightColor.r);
         ImGui::DragFloat3("Light Position", &lightPos.x, 0.1f);
         ImGui::End();
@@ -235,6 +244,8 @@ int main() {
 		toonShader.setFloat("specularStr", specularStr);
 		toonShader.setFloat("shininess", shininess);
 		toonShader.setInt("toonLevels", toonLevels);
+		toonShader.setBool("enableRim", enableRim);
+		toonShader.setFloat("rimStrength", rimStrength);
         teapot2.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
         teapot2.Draw(toonShader);
 

@@ -16,10 +16,26 @@ uniform vec3 lightPos;   // Gets the position of the light
 uniform vec3 camPos; // Gets the position of the camera
 
 uniform float ambient; // Ambient strength
-uniform int toonLevels;  // Number of toon shading bands
-uniform float specularStr; // Specular strength
-uniform float shininess; // Shininess factor
+uniform float metallic; // Metalness factor
+uniform float roughness; // Surface roughness
 
+const float PI = 3.14159265359;
+
+// GGX Distribution that controls shape of highlights
+// Rough surface = wide and dim highlights
+// Smooth surface = tight and bright highlights
+float GGXDistribution(float NdotH, float roughness) {
+    float a = roughness * roughness; // linear
+    float a2 = a * a;
+    float denom = (NdotH * NdotH) * (a2 - 1.0) + 1.0; // Bell Curve denominator
+    denom = PI * denom * denom;
+    return a2 / denom; // D term for alligned microfacets
+}
+
+// Shlick Fresnel function
+vec3 FresnelSchlick(float cosTheta, vec3 F0) {
+
+}
 
 void main() {
     // Lighting Vectors

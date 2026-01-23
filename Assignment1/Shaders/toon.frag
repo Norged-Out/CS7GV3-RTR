@@ -13,13 +13,15 @@ uniform float uvScale = 1.0;
 
 uniform vec4 lightColor; // Gets the color of the light
 uniform vec3 lightPos;   // Gets the position of the light
+uniform vec3 camPos; // Gets the position of the camera
 
 uniform float ambient; // Ambient strength
 uniform float specularStr; // Specular strength
 uniform float shininess; // Shininess factor
 uniform int toonLevels;  // Number of toon shading bands
 
-uniform vec3 camPos; // Gets the position of the camera
+uniform bool enableRim; // Toggle Rim Lighting
+uniform float rimStrength; // Strength of Rim Lighting
 
 
 void main() {
@@ -38,17 +40,25 @@ void main() {
     float levels = float(toonLevels);
     float diffuse = floor(diffuseIntensity * levels) / levels;
     
-    // Specular (highlights must be 'painted')
+    // Specular (quantize into discrete bands)
     float spec = pow(max(dot(N, H), 0.0), shininess);
-    float specular = 0.0; // default to no highlights
-    if (spec > 0.5) specular = 1.0; // hard cutoff for toon effect
+    if (spec > 0.01) spec = floor(spec * levels) / levels;
+    float specular = specularStr * spec;
+
+    // Rim Lighting
+    float rim = 0.0;
+    if (enableRim) {
+        float rimFactor = 1.0 - max(dot(N, V), 0.0); // Edges perpendicular to camera
+        float rimIntensity = pow(rimFactor, 3); // sharp falloff
+        if (rimIntensity > 0.5) rim = rimStrength; // threshold application
+    }
     
     // Sample textures
     vec4 diffuseColor = texture(diffuse0, texCoord * uvScale);
     float specularMap = texture(specular0, texCoord * uvScale).r;
     
     // Combine
-    vec3 result = (diffuseColor.rgb * (ambient + diffuse) + specularMap * specular) * lightColor.rgb;
+    vec3 result = (diffuseColor.rgb * (ambient + diffuse) + specularMap * specular + rim) * lightColor.rgb;
 
     result *= attenuation;  // Apply distance falloff
 
