@@ -102,7 +102,7 @@ static void setupCamera(GLFWwindow* window, Camera& camera) {
         });
     // Point camera at scene center
     glm::vec3 target(0.0f, 0.0f, 0.0f);
-    camera.Position = glm::vec3(0.0f, 2.0f, 4.0f);   // back a bit, slightly up
+    camera.Position = glm::vec3(0.0f, 2.0f, 10.0f);   // back a bit, slightly up
     glm::vec3 dir = glm::normalize(target - camera.Position);
     camera.Orientation = dir;
     camera.pitch = glm::degrees(asin(dir.y));
@@ -202,16 +202,19 @@ int main() {
 
     Shader blinnPhongShader("Shaders/scene.vert", "Shaders/blinnPhong.frag");
     blinnPhongShader.Activate();
+	blinnPhongShader.setBool("useTextures", false);
     blinnPhongShader.setInt("diffuse0", 0);
     blinnPhongShader.setInt("specular0", 1);
 
 	Shader toonShader("Shaders/scene.vert", "Shaders/toon.frag");
 	toonShader.Activate();
+    toonShader.setBool("useTextures", false);
 	toonShader.setInt("diffuse0", 0);
 	toonShader.setInt("specular0", 1);
 
 	Shader cookTorranceShader("Shaders/scene.vert", "Shaders/cookTorrance.frag");
 	cookTorranceShader.Activate();
+    cookTorranceShader.setBool("useTextures", false);
 	cookTorranceShader.setInt("diffuse0", 0);
 	cookTorranceShader.setInt("specular0", 1);
 
@@ -220,15 +223,9 @@ int main() {
 
 	// attempt to load teapot model
     float t0 = (float)glfwGetTime();
-	Model teapot1("Models/clay-teapot/teapot.fbx",
-                  "Models/clay-teapot/teapot_BaseColor.png",
-                  "Models/clay-teapot/teapot_Roughness.png");
-    Model teapot2("Models/clay-teapot/teapot.fbx",
-                  "Models/clay-teapot/teapot_BaseColor.png",
-                  "Models/clay-teapot/teapot_Roughness.png");
-    Model teapot3("Models/clay-teapot/teapot.fbx",
-                  "Models/clay-teapot/teapot_BaseColor.png",
-                  "Models/clay-teapot/teapot_Roughness.png");
+	Model teapot1("Models/clay-teapot/teapot.fbx");
+    Model teapot2("Models/clay-teapot/teapot.fbx");
+    Model teapot3("Models/clay-teapot/teapot.fbx");
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] teapots took " << (t1 - t0) << "s\n";
     
@@ -251,7 +248,7 @@ int main() {
 
     // ------------ Render Loop ------------
     float prevTime = (float)glfwGetTime();
-	bool pWasDown = false;
+	bool pWasDown = true;
     float rotationSpeed = 20.0f;
 	float angle = 0.0f;
     glm::vec3 target(0.0f, 0.0f, 0.0f);

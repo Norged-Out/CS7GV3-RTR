@@ -18,7 +18,7 @@ public:
     // constructors
     explicit Model(const std::string& path);
     Model(const std::string& path, const std::vector<std::string>& skipNames);
-    Model(const std::string& path, const std::string& diffusePath = "", const std::string& specularPath = "");
+    Model(const std::string& path, const std::string& diffusePath, const std::string& specularPath);
 
     // Prevent copying
     Model(const Model&) = delete;

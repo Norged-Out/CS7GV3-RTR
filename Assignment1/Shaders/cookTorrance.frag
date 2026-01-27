@@ -7,6 +7,7 @@ in vec2 texCoord;      // Receive texture coordinates from vertex shader
 
 out vec4 fragColor;
 
+uniform bool useTextures = true; // Toggle texture usage
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D specular0; // texture unit for specular
 uniform float uvScale = 1.0;
@@ -65,9 +66,9 @@ void main() {
     float distance = length(lightPos - currPos);
     float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
 
-    // Sample textures
-    vec3 albedo = texture(diffuse0, texCoord * uvScale).rgb;
-    float roughnessMap = texture(specular0, texCoord * uvScale).r;
+    // Sample textures with fallback
+    vec3 albedo = useTextures ? texture(diffuse0, texCoord * uvScale).rgb : vertexColor;
+    float roughnessMap = useTextures ? texture(specular0, texCoord * uvScale).r : 0.5;
     float finalRoughness = roughness * roughnessMap; // combine uniform and texture
     finalRoughness = clamp(finalRoughness, 0.04, 1.0); // avoid 0 roughness
 
@@ -79,12 +80,9 @@ void main() {
     float F = FresnelReflection(VdotH, F0); // reflectivity at angle
     float G = GeometricShadow(NdotV, NdotL, finalRoughness); // shadowing/masking
     float specular = (D * F * G) / max(4.0 * NdotV * NdotL, 0.001);
-
-    // Contribution factors
-    float kS = F; // specular reflection
-    float kD = (1.0 - kS) * (1.0 - metallic); // diffuse scattering
-
+    
     // Diffuse and Ambience terms
+    float kD = (1.0 - F) * (1.0 - metallic); // diffuse scattering
     vec3 diffuse = (albedo / PI) * kD; // Lambertian diffuse
     vec3 ambientTerm = ambient * albedo; // Ambient term
 

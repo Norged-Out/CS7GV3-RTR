@@ -7,6 +7,7 @@ in vec2 texCoord;      // Receive texture coordinates from vertex shader
 
 out vec4 fragColor;
 
+uniform bool useTextures = true; // Toggle texture usage
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D specular0; // texture unit for specular
 uniform float uvScale = 1.0;
@@ -18,8 +19,8 @@ uniform vec3 camPos; // Gets the position of the camera
 uniform float ambient; // Ambient strength
 uniform float specularStr; // Specular strength
 uniform float shininess; // Shininess factor
-uniform int toonLevels;  // Number of toon shading bands
 
+uniform int toonLevels;  // Number of toon shading bands
 uniform bool enableRim; // Toggle Rim Lighting
 uniform float rimStrength; // Strength of Rim Lighting
 
@@ -53,14 +54,14 @@ void main() {
         if (rimIntensity > 0.5) rim = rimStrength; // threshold application
     }
     
-    // Sample textures
-    vec4 diffuseColor = texture(diffuse0, texCoord * uvScale);
-    float specularMap = texture(specular0, texCoord * uvScale).r;
+    // Sample textures with fallback
+    vec4 baseColor = useTextures ? texture(diffuse0, texCoord * uvScale) : vec4(vertexColor, 1.0);
+    float specularMap = useTextures ? texture(specular0, texCoord * uvScale).r : 0.5;
     
     // Combine
-    vec3 result = (diffuseColor.rgb * (ambient + diffuse) + specularMap * specular + rim) * lightColor.rgb;
+    vec3 result = (baseColor.rgb * (ambient + diffuse) + specularMap * specular + rim) * lightColor.rgb;
 
     result *= attenuation;  // Apply distance falloff
 
-    fragColor = vec4(result, diffuseColor.a);
+    fragColor = vec4(result, baseColor.a);
 }
