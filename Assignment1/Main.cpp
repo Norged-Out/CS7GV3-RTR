@@ -202,31 +202,31 @@ int main() {
 
     Shader blinnPhongShader("Shaders/scene.vert", "Shaders/blinnPhong.frag");
     blinnPhongShader.Activate();
-	//blinnPhongShader.setBool("useTextures", false);
-    blinnPhongShader.setInt("diffuse0", 0);
-    blinnPhongShader.setInt("specular0", 1);
+	blinnPhongShader.setBool("useTextures", false);
+    /*blinnPhongShader.setInt("diffuse0", 0);
+    blinnPhongShader.setInt("specular0", 1);*/
 
 	Shader toonShader("Shaders/scene.vert", "Shaders/toon.frag");
 	toonShader.Activate();
-    //toonShader.setBool("useTextures", false);
-	toonShader.setInt("diffuse0", 0);
-	toonShader.setInt("specular0", 1);
+    toonShader.setBool("useTextures", false);
+	/*toonShader.setInt("diffuse0", 0);
+	toonShader.setInt("specular0", 1);*/
 
 	Shader cookTorranceShader("Shaders/scene.vert", "Shaders/cookTorrance.frag");
 	cookTorranceShader.Activate();
-    //cookTorranceShader.setBool("useTextures", false);
-	cookTorranceShader.setInt("diffuse0", 0);
-	cookTorranceShader.setInt("specular0", 1);
+    cookTorranceShader.setBool("useTextures", false);
+	/*cookTorranceShader.setInt("diffuse0", 0);
+	cookTorranceShader.setInt("specular0", 1);*/
 
     // ------------ Load Models ------------
     std::cout << "Loading models..." << std::endl;
 
 	// attempt to load teapot model
     float t0 = (float)glfwGetTime();
-	/*Model teapot1("Models/clay-teapot/teapot.fbx");
+	Model teapot1("Models/clay-teapot/teapot.fbx");
     Model teapot2("Models/clay-teapot/teapot.fbx");
-    Model teapot3("Models/clay-teapot/teapot.fbx");*/
-	Model teapot1("Models/clay-teapot/teapot.fbx",
+    Model teapot3("Models/clay-teapot/teapot.fbx");
+	/*Model teapot1("Models/clay-teapot/teapot.fbx",
                   "Models/clay-teapot/teapot_BaseColor.png",
                   "Models/clay-teapot/teapot_Roughness.png");
     Model teapot2("Models/clay-teapot/teapot.fbx",
@@ -234,7 +234,7 @@ int main() {
                   "Models/clay-teapot/teapot_Roughness.png");
     Model teapot3("Models/clay-teapot/teapot.fbx",
                   "Models/clay-teapot/teapot_BaseColor.png",
-                  "Models/clay-teapot/teapot_Roughness.png");
+                  "Models/clay-teapot/teapot_Roughness.png");*/
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] teapots took " << (t1 - t0) << "s\n";
     
