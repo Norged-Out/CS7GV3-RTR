@@ -25,8 +25,8 @@ const float PI = 3.14159265359;
 // GGX Distribution that controls shape of highlights
 // Rough surface = wide and dim highlights
 // Smooth surface = tight and bright highlights
-float GGXDistribution(float NdotH, float roughness) {
-    float a = roughness * roughness; // linear
+float GGXDistribution(float NdotH, float rough) {
+    float a = rough * rough; // linear
     float a2 = a * a;
     float denom = (NdotH * NdotH) * (a2 - 1.0) + 1.0; // Bell Curve denominator
     denom = PI * denom * denom;
@@ -42,8 +42,8 @@ float FresnelReflection(float VdotH, float F0) {
 
 // Geometry Function (Smith's method)
 // Models self-shadowing of microfacets
-float GeometricShadow(float NdotV, float NdotL, float roughness) {
-    float k = roughness * roughness / 2.0; // remap roughness for direct lighting
+float GeometricShadow(float NdotV, float NdotL, float rough) {
+    float k = rough * rough / 2.0; // remap roughness for direct lighting
     float g1 = NdotV / (NdotV * (1.0 - k) + k); // shadowing from view
     float g2 = NdotL / (NdotL * (1.0 - k) + k); // shadowing from light
     return g1 * g2; // combined shadowing
