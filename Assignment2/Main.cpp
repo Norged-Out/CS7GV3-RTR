@@ -5,6 +5,10 @@
 #include "Model.h"
 #include "Shader.h"
 
+#include "EXR.h"
+#include "Cubemap.h"
+#include "eqr2cmap.h"
+
 
 // -------------------- Establish globals --------------------
 
@@ -154,12 +158,12 @@ void renderModel(Model& model, Shader& shader, Camera& camera,
 // -------------------- Main --------------------
 
 int main() {
-    std::cout << "Assignment 1: Lighting Models Comparison" << std::endl;
+    std::cout << "Assignment 2: Transmitance Effects" << std::endl;
 
     // ------------ Initialize the Window ------------
 
     // create a window of 800x800 size
-    GLFWwindow* window = initWindow(width, height, "Assignment 1: Lighting Models");
+    GLFWwindow* window = initWindow(width, height, "Assignment 2: Transmitance Effects");
     if (!window) return -1;
 
     // sanity check for smooth camera motion
@@ -176,6 +180,12 @@ int main() {
     Camera camera(width, height, glm::vec3(0.0f, 0.0f, 2.0f));
 	setupCamera(window, camera);
 
+	// Load HDR texture for environment mapping
+    EXR hdri("Environment/environment.hdr");
+    Cubemap environment(512);
+	eqr2cmap converter(512);
+	converter.convert(hdri, environment);
+
     // Initialize ImGui
     /*IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -188,33 +198,23 @@ int main() {
 	// ------------ Load Shaders ------------
     std::cout << "Loading shaders..." << std::endl;
 
-    Shader blinnPhongShader("Shaders/scene.vert", "Shaders/blinnPhong.frag");
-    blinnPhongShader.Activate();
-	blinnPhongShader.setBool("useTextures", true);
-    blinnPhongShader.setInt("diffuse0", 0);
-    blinnPhongShader.setInt("specular0", 1);
+    Shader sceneShader("Shaders/scene.vert", "Shaders/scene.frag");
+    sceneShader.Activate();
+	environment.Bind(5);
+	sceneShader.setInt("environmentMap", 5);
 
-	Shader cookTorranceShader("Shaders/scene.vert", "Shaders/cookTorrance.frag");
-	cookTorranceShader.Activate();
-    cookTorranceShader.setBool("useTextures", true);
-	cookTorranceShader.setInt("diffuse0", 0);
-	cookTorranceShader.setInt("specular0", 1);
-
+	Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
     // ------------ Load Models ------------
     std::cout << "Loading models..." << std::endl;
 
 	// attempt to load model
     float t0 = (float)glfwGetTime();
-    Model model1("Models/robot-2020/robo.fbx");
-	Model model2("Models/robot-2020/robo.fbx");
+    Model myModel("Models/robot-2020/robo.fbx");
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] Model took " << (t1 - t0) << "s\n";
 
-	model1.setScale(glm::vec3(0.01f));
-	model1.setPosition(glm::vec3(-4.0f, 0.0f, 0.0f));
-
-    model2.setScale(glm::vec3(0.01f));
-	model2.setPosition(glm::vec3(4.0f, 0.0f, 0.0f));
+	myModel.setScale(glm::vec3(0.01f));
+	myModel.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 
 
 	// ------------ Lighting Parameters ------------
@@ -252,17 +252,12 @@ int main() {
             camera.ToggleCinema(target);
         }
         pWasDown = pDown;
-        // Updates and exports the camera matrix to the Vertex ShadeR
+        // Updates and exports the camera matrix to the Vertex Shader
         camera.UpdateWithMode(window, dt);
         camera.updateMatrix(0.5f, 100.0f);
-
-		// give shader the common uniforms
-        blinnPhongShader.Activate();
-        camera.Matrix(blinnPhongShader, "camMatrix");
         
         // Render scene
-        renderModel(model1, blinnPhongShader, camera, lightingParams, angle);
-        renderModel(model2, cookTorranceShader, camera, lightingParams, angle);
+        renderModel(myModel, sceneShader, camera, lightingParams, angle);
      
         // Render ImGui
         /*ImGui::Render();
@@ -284,8 +279,8 @@ int main() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();*/
 	// delete shader program
-    blinnPhongShader.Delete();
-	cookTorranceShader.Delete();
+    sceneShader.Delete();
+    skyboxShader.Delete();
     // deletes window before ending program
     glfwDestroyWindow(window);
     // terminate GLFW before ending program
