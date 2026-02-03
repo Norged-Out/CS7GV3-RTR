@@ -5,9 +5,10 @@
 #include "Model.h"
 #include "Shader.h"
 
-#include "EXR.h"
-#include "Cubemap.h"
-#include "eqr2cmap.h"
+#include "Environment/HDRTexture.h"
+#include "Environment/Cubemap.h"
+#include "Environment/HDRConverter.h"
+#include "Environment/Skybox.h"
 
 
 // -------------------- Establish globals --------------------
@@ -22,12 +23,12 @@ struct LightingParams {
     float ambient = 0.5f;
 
     // Blinn-Phong
-    float specularStr = 0.5f;
-    float shininess = 32.0f;
+    /*float specularStr = 0.5f;
+    float shininess = 32.0f;*/
 
 	// Cook-Torrance
-    float metallic = 0.5f;
-    float roughness = 0.5f;
+    /*float metallic = 0.5f;
+    float roughness = 0.5f;*/
 };
 
 // -------------------- Initialize GLFW --------------------
@@ -95,45 +96,14 @@ static void setupCamera(GLFWwindow* window, Camera& camera) {
         });
     // Point camera at scene center
     glm::vec3 target(0.0f, 0.0f, 0.0f);
-    camera.Position = glm::vec3(0.0f, 2.0f, 10.0f);   // back a bit, slightly up
+    camera.Position = glm::vec3(0.0f, 0.0f, 10.0f);   // back a bit, slightly down
     glm::vec3 dir = glm::normalize(target - camera.Position);
     camera.Orientation = dir;
     camera.pitch = glm::degrees(asin(dir.y));
     camera.yaw = glm::degrees(atan2(dir.z, dir.x));
 }
 
-/*
-void buildGUI(LightingParams& params) {
-    ImGui::Begin("Lighting Controls");
-    ImGui::Text("Adjust lighting parameters:");
-    ImGui::Separator();
-
-    ImGui::SliderFloat("Light Intensity", &params.intensity, 0.5f, 5.0f);
-    ImGui::SliderFloat("Ambient", &params.ambient, 0.0f, 1.0f);
-    ImGui::ColorEdit3("Light Color", &params.color.r);
-    ImGui::DragFloat3("Light Position", &params.position.x, 0.1f);
-    ImGui::Separator();
-
-    ImGui::Text("Blinn-Phong (Center):");
-    ImGui::SliderFloat("Specular Strength", &params.specularStr, 0.0f, 2.0f);
-    ImGui::SliderFloat("Shininess", &params.shininess, 1.0f, 128.0f);
-    ImGui::Separator();
-
-    ImGui::Text("Toon Shader (Left):");
-    ImGui::SliderInt("Toon Levels", &params.toonLevels, 2, 5);
-    ImGui::Checkbox("Enable Rim", &params.enableRim);
-    ImGui::SliderFloat("Rim Strength", &params.rimStrength, 0.0f, 1.0f);
-    ImGui::Separator();
-
-    ImGui::Text("Cook-Torrance (Right):");
-    ImGui::SliderFloat("Metallic", &params.metallic, 0.0f, 1.0f);
-    ImGui::SliderFloat("Roughness", &params.roughness, 0.04f, 1.0f);
-
-    ImGui::End();
-}
-*/
-
-void renderModel(Model& model, Shader& shader, Camera& camera,
+static void renderModel(Model& model, Shader& shader, Camera& camera,
     const LightingParams& params, float angle) {
     shader.Activate();
     camera.Matrix(shader, "camMatrix");
@@ -144,12 +114,6 @@ void renderModel(Model& model, Shader& shader, Camera& camera,
     shader.setVec4("lightColor", finalLightColor);
     shader.setVec3("lightPos", params.position);
     shader.setFloat("ambient", params.ambient);
-
-    // Shader-specific uniforms (check if uniform exists before setting)
-    shader.setFloat("specularStr", params.specularStr);
-    shader.setFloat("shininess", params.shininess);
-    shader.setFloat("metallic", params.metallic);
-    shader.setFloat("roughness", params.roughness);
 
     /*model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));*/
     model.Draw(shader);
@@ -181,19 +145,11 @@ int main() {
 	setupCamera(window, camera);
 
 	// Load HDR texture for environment mapping
-    EXR hdri("Environment/environment.hdr");
+    HDRTexture hdri("Environment/environment.hdr");
     Cubemap environment(512);
-	eqr2cmap converter(512);
+	HDRConverter converter(512);
 	converter.convert(hdri, environment);
-
-    // Initialize ImGui
-    /*IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");*/
-
+	Skybox skybox(environment);
 
 	// ------------ Load Shaders ------------
     std::cout << "Loading shaders..." << std::endl;
@@ -203,7 +159,6 @@ int main() {
 	environment.Bind(5);
 	sceneShader.setInt("environmentMap", 5);
 
-	Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
     // ------------ Load Models ------------
     std::cout << "Loading models..." << std::endl;
 
@@ -213,8 +168,9 @@ int main() {
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] Model took " << (t1 - t0) << "s\n";
 
-	myModel.setScale(glm::vec3(0.01f));
+	
 	myModel.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    myModel.setScale(glm::vec3(0.01f));
 
 
 	// ------------ Lighting Parameters ------------
@@ -235,12 +191,6 @@ int main() {
         prevTime = now;
         angle = now * rotationSpeed;
 
-        // Start ImGui frame
-        /*ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-		buildGUI(lightingParams);*/
-
         // clear the screen and specify background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         // clean back buffer and depth buffer
@@ -258,10 +208,9 @@ int main() {
         
         // Render scene
         renderModel(myModel, sceneShader, camera, lightingParams, angle);
-     
-        // Render ImGui
-        /*ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());*/
+
+		// Render skybox last
+		skybox.Draw(camera);
 
         // unbind the VAO
         glBindVertexArray(0);
@@ -273,14 +222,9 @@ int main() {
     }
 
     // ------------ Clean up ------------
-
-    // Cleanup ImGui
-    /*ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();*/
+    
 	// delete shader program
     sceneShader.Delete();
-    skyboxShader.Delete();
     // deletes window before ending program
     glfwDestroyWindow(window);
     // terminate GLFW before ending program
