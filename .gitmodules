@@ -1,0 +1,6 @@
+[submodule "Test/OpenGL_Engine"]
+	path = Test/OpenGL_Engine
+	url = https://github.com/Norged-Out/OpenGL_Engine.git
+[submodule "OpenGL_Engine"]
+	path = OpenGL_Engine
+	url = https://github.com/Norged-Out/OpenGL_Engine.git
