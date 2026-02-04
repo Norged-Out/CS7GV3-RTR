@@ -1,0 +1,3 @@
+[submodule "Assignment2/OpenGL_Engine"]
+	path = Assignment2/OpenGL_Engine
+	url = https://github.com/Norged-Out/OpenGL_Engine.git
