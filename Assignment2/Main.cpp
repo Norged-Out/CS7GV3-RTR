@@ -1,21 +1,26 @@
-#include<iostream>
-#include<glad/glad.h>
-#include<GLFW/glfw3.h>
-#include "Camera.h"
-#include "Model.h"
-#include "Shader.h"
+/*
+* Author: Priyansh Nayak
+* Project: Transmittance Effects
+* Course: CS7GV3: Real-Time Rendering
+*/
+
+#include <iostream>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <engine/Camera.h>
+#include <engine/Model.h>
+#include <engine/Shader.h>
 
 // enviroment
-#include "Environment/HDRTexture.h"
-#include "Environment/Cubemap.h"
-#include "Environment/HDRConverter.h"
-#include "Environment/Skybox.h"
+#include <engine/HDRTexture.h>
+#include <engine/Cubemap.h>
+#include <engine/HDRConverter.h>
+#include <engine/Skybox.h>
 
 // imgui
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-
 
 // -------------------- Establish globals --------------------
 
@@ -29,7 +34,7 @@ struct TweakableParams {
 
     // HDR exposure
     float exposure = 1.0f;        
-    float skyboxExposure = 0.8f;
+    float skyboxExposure = 0.7f;
 
     bool enableReflection = true;
     bool enableRefraction = true;
@@ -100,7 +105,7 @@ static void setupCamera(GLFWwindow* window, Camera& camera) {
         });
     // Point camera at scene center
     glm::vec3 target(0.0f, 0.0f, 0.0f);
-    camera.Position = glm::vec3(0.0f, 0.0f, 10.0f);   // back a bit, slightly down
+    camera.Position = glm::vec3(0.0f, 0.0f, 10.0f);
     glm::vec3 dir = glm::normalize(target - camera.Position);
     camera.Orientation = dir;
     camera.pitch = glm::degrees(asin(dir.y));
@@ -147,12 +152,12 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
 // -------------------- Main --------------------
 
 int main() {
-    std::cout << "Assignment 2: Transmitance Effects" << std::endl;
+    std::cout << "Assignment 2: Transmittance Effects" << std::endl;
 
     // ------------ Initialize the Window ------------
 
     // create a window of 800x800 size
-    GLFWwindow* window = initWindow(width, height, "Assignment 2: Transmitance Effects");
+    GLFWwindow* window = initWindow(width, height, "Assignment 2: Transmittance Effects");
     if (!window) return -1;
 
     // sanity check for smooth camera motion
@@ -200,17 +205,20 @@ int main() {
 	// attempt to load model
     float t0 = (float)glfwGetTime();
     Model model1("Models/robot-2020/robo.fbx");
-    Model model2("Models/steampunk_robot.glb");
+    Model model2("Models/space_robot.glb");
+    Model model3("Models/penguin-bot.glb");
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] Model took " << (t1 - t0) << "s\n";
 
 	
-	model1.setPosition(glm::vec3(-4.0f, 0.0f, 0.0f));
+	model1.setPosition(glm::vec3(-5.0f, -2.5f, -2.0f));
     model1.setScale(glm::vec3(0.01f));
 
-	model2.setPosition(glm::vec3(4.0f, 0.0f, 0.0f));
-	model2.setRotation(180.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    model2.setScale(glm::vec3(5.0f));
+	model2.setPosition(glm::vec3(5.0f, 0.0f, -1.0f));
+    model2.setScale(glm::vec3(2.5f));
+
+    model3.setPosition(glm::vec3(0.0f, -2.5f, 0.0f));
+    model3.setScale(glm::vec3(0.5f));
 
     // ------------ Render Loop ------------
     TweakableParams params;
@@ -251,6 +259,7 @@ int main() {
         // Render scene
         renderModel(model1, sceneShader, camera, params, angle);
 		renderModel(model2, sceneShader, camera, params, angle);
+        renderModel(model3, sceneShader, camera, params, angle);
 
 		// Render skybox last
         skyboxShader.Activate();
