@@ -5,10 +5,16 @@
 #include "Model.h"
 #include "Shader.h"
 
+// enviroment
 #include "Environment/HDRTexture.h"
 #include "Environment/Cubemap.h"
 #include "Environment/HDRConverter.h"
 #include "Environment/Skybox.h"
+
+// imgui
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 
 // -------------------- Establish globals --------------------
@@ -16,19 +22,17 @@
 const unsigned int width = 1200;
 const unsigned int height = 800;
 
-struct LightingParams {
-    float intensity = 1.0f;
-    glm::vec3 position = glm::vec3(0.0f, 5.0f, 2.0f);
-    glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
-    float ambient = 0.5f;
+struct TweakableParams {
+    float baseIOR = 1.52f;        // Glass default
+    float fresnelPower = 5.0f;    // Schlick exponent
+    float dispersion = 0.01f;     // Small wavelength offset
 
-    // Blinn-Phong
-    /*float specularStr = 0.5f;
-    float shininess = 32.0f;*/
+    // HDR exposure
+    float exposure = 1.0f;        
+    float skyboxExposure = 0.8f;
 
-	// Cook-Torrance
-    /*float metallic = 0.5f;
-    float roughness = 0.5f;*/
+    bool enableReflection = true;
+    bool enableRefraction = true;
 };
 
 // -------------------- Initialize GLFW --------------------
@@ -103,19 +107,40 @@ static void setupCamera(GLFWwindow* window, Camera& camera) {
     camera.yaw = glm::degrees(atan2(dir.z, dir.x));
 }
 
+static void buildGUI(TweakableParams& params) {
+    ImGui::Begin("Transmission Controls");
+
+    ImGui::Text("Optical Properties");
+    ImGui::SliderFloat("Base IOR", &params.baseIOR, 1.0f, 2.0f);
+    ImGui::SliderFloat("Fresnel Power", &params.fresnelPower, 1.0f, 10.0f);
+    ImGui::SliderFloat("Dispersion Strength", &params.dispersion, 0.0f, 0.05f);
+
+    ImGui::Separator();
+
+    ImGui::Text("Rendering");
+    ImGui::SliderFloat("Exposure", &params.exposure, 0.1f, 5.0f);
+    ImGui::SliderFloat("Skybox Exposure", &params.skyboxExposure, 0.1f, 3.0f);
+    ImGui::Checkbox("Enable Reflection", &params.enableReflection);
+    ImGui::Checkbox("Enable Refraction", &params.enableRefraction);
+
+    ImGui::End();
+}
+
 static void renderModel(Model& model, Shader& shader, Camera& camera,
-    const LightingParams& params, float angle) {
+    const TweakableParams& params, float angle) {
     shader.Activate();
     camera.Matrix(shader, "camMatrix");
 
-    // Common uniforms
-    glm::vec4 finalLightColor = params.color * params.intensity;
+    // Controllable uniforms
     shader.setVec3("camPos", camera.Position);
-    shader.setVec4("lightColor", finalLightColor);
-    shader.setVec3("lightPos", params.position);
-    shader.setFloat("ambient", params.ambient);
+    shader.setFloat("baseIOR", params.baseIOR);
+    shader.setFloat("fresnelPower", params.fresnelPower);
+    shader.setFloat("dispersion", params.dispersion);
+    shader.setFloat("exposure", params.exposure);
+    shader.setBool("enableReflection", params.enableReflection);
+    shader.setBool("enableRefraction", params.enableRefraction);
 
-    /*model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));*/
+    model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
     model.Draw(shader);
 }
 
@@ -144,8 +169,16 @@ int main() {
     Camera camera(width, height, glm::vec3(0.0f, 0.0f, 2.0f));
 	setupCamera(window, camera);
 
+    // Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
 	// Load HDR texture for environment mapping
-    HDRTexture hdri("Environment/environment.hdr");
+    HDRTexture hdri("Environment/lakeside_sunrise.hdr");
     Cubemap environment(512);
 	HDRConverter converter(512);
 	converter.convert(hdri, environment);
@@ -159,25 +192,28 @@ int main() {
 	environment.Bind(5);
 	sceneShader.setInt("environmentMap", 5);
 
+	Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
+
     // ------------ Load Models ------------
     std::cout << "Loading models..." << std::endl;
 
 	// attempt to load model
     float t0 = (float)glfwGetTime();
-    Model myModel("Models/robot-2020/robo.fbx");
+    Model model1("Models/robot-2020/robo.fbx");
+    Model model2("Models/steampunk_robot.glb");
     float t1 = (float)glfwGetTime();
     std::cout << "[Load] Model took " << (t1 - t0) << "s\n";
 
 	
-	myModel.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    myModel.setScale(glm::vec3(0.01f));
+	model1.setPosition(glm::vec3(-4.0f, 0.0f, 0.0f));
+    model1.setScale(glm::vec3(0.01f));
 
-
-	// ------------ Lighting Parameters ------------
-	LightingParams lightingParams;
-	// references for easy access
+	model2.setPosition(glm::vec3(4.0f, 0.0f, 0.0f));
+	model2.setRotation(180.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    model2.setScale(glm::vec3(5.0f));
 
     // ------------ Render Loop ------------
+    TweakableParams params;
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = true;
     float rotationSpeed = 20.0f;
@@ -190,6 +226,12 @@ int main() {
         float dt = now - prevTime;
         prevTime = now;
         angle = now * rotationSpeed;
+
+        // Start ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        buildGUI(params);
 
         // clear the screen and specify background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
@@ -207,10 +249,17 @@ int main() {
         camera.updateMatrix(0.5f, 100.0f);
         
         // Render scene
-        renderModel(myModel, sceneShader, camera, lightingParams, angle);
+        renderModel(model1, sceneShader, camera, params, angle);
+		renderModel(model2, sceneShader, camera, params, angle);
 
 		// Render skybox last
-		skybox.Draw(camera);
+        skyboxShader.Activate();
+        skyboxShader.setFloat("skyboxExposure", params.skyboxExposure);
+		skybox.Draw(camera, skyboxShader);
+
+        // Render ImGui
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // unbind the VAO
         glBindVertexArray(0);
@@ -223,6 +272,10 @@ int main() {
 
     // ------------ Clean up ------------
     
+    // Cleanup ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 	// delete shader program
     sceneShader.Delete();
     // deletes window before ending program

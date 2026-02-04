@@ -1,0 +1,7 @@
+Package: kubazip
+Version: 0.3.5
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 8c3560122bbfa7591c60e9affc79961ebbaac49cfe155f34f611a63d917fbc67
+Description: A portable, simple zip library written in C

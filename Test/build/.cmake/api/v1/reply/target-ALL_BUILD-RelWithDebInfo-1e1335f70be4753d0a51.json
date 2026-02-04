@@ -1,0 +1,39 @@
+{
+	"backtrace" : 0,
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : 
+		[
+			"OpenGL_Engine/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			}
+		]
+	},
+	"dependencies" : 
+	[
+		{
+			"id" : "glad::@4bcbac7037e571a8b690"
+		},
+		{
+			"id" : "engine::@4bcbac7037e571a8b690"
+		},
+		{
+			"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df"
+		}
+	],
+	"id" : "ALL_BUILD::@4bcbac7037e571a8b690",
+	"isGeneratorProvided" : true,
+	"name" : "ALL_BUILD",
+	"paths" : 
+	{
+		"build" : "OpenGL_Engine",
+		"source" : "OpenGL_Engine"
+	},
+	"sources" : [],
+	"type" : "UTILITY"
+}

@@ -1,0 +1,7 @@
+Package: rapidjson
+Version: 2025-02-26
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-windows
+Multi-Arch: same
+Abi: 89e8ce1f1575f3e73b28fa40a008c494ec5b193a66e831f8f1ffa60c834b7afa
+Description: A fast JSON parser/generator for C++ with both SAX/DOM style API <http://rapidjson.org/>

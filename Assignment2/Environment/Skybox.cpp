@@ -3,8 +3,7 @@
 #include <glm/glm.hpp>
 
 Skybox::Skybox(Cubemap& cubemap)
-    : shader("Shaders/skybox.vert", "Shaders/skybox.frag"),
-    environment(cubemap)
+    : environment(cubemap)
 {
     initCube();
 }
@@ -13,7 +12,6 @@ Skybox::~Skybox()
 {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
-	shader.Delete();
 }
 
 void Skybox::initCube()
@@ -54,7 +52,7 @@ void Skybox::initCube()
     glBindVertexArray(0);
 }
 
-void Skybox::Draw(const Camera& camera) {
+void Skybox::Draw(const Camera& camera, Shader& shader) {
     // Save state
     GLboolean wasCulling = glIsEnabled(GL_CULL_FACE);
     GLint prevCullFace;
@@ -66,8 +64,6 @@ void Skybox::Draw(const Camera& camera) {
     // draw inner faces
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
-
-    shader.Activate();
 
     // remove translation from view matrix
     glm::mat4 view = glm::mat4(glm::mat3(camera.view));
