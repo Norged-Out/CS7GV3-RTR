@@ -1,6 +1,0 @@
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/CMakeFiles/app.dir
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/CMakeFiles/ZERO_CHECK.dir
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/OpenGL_Engine/CMakeFiles/glad.dir
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/OpenGL_Engine/CMakeFiles/engine.dir
-C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/OpenGL_Engine/CMakeFiles/ALL_BUILD.dir

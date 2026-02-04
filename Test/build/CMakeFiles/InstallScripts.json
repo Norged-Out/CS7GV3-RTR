@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/cmake_install.cmake",
-		"C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Test/build/OpenGL_Engine/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
