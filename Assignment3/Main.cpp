@@ -1,7 +1,7 @@
 /*
 * Author: Priyansh Nayak
-* Project: Test
-* Course: CS7GV5: Real-Time Animation
+* Project: Normal Mapping
+* Course: CS7GV3: Real-Time Rendering
 */
 
 #include <iostream>
@@ -33,6 +33,10 @@ struct TweakableParams {
     glm::vec3 position = glm::vec3(0.0f, 5.0f, 3.0f);
     glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
     float ambient = 0.25f;
+
+    // Rendering toggles
+    bool useTextures = false;
+    bool useNormalMap = false;
 };
 
 // -------------------- Initialize GLFW --------------------
@@ -120,6 +124,10 @@ static void buildGUI(TweakableParams& params) {
     ImGui::ColorEdit3("Light Color", &params.color.r);
     ImGui::DragFloat3("Light Position", &params.position.x, 0.1f);
 
+    ImGui::Separator();
+    ImGui::Checkbox("Use Textures", &params.useTextures);
+    ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
+
     ImGui::End();
 }
 
@@ -127,6 +135,12 @@ static void buildGUI(TweakableParams& params) {
 
 static void renderModel(Model& model, Shader& shader, Camera& camera,
     TweakableParams& params) {
+    // Ensure correct depth state before drawing 3D geometry
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+
+    // Set shader uniforms
     shader.Activate();
     camera.Matrix(shader, "camMatrix");
 
@@ -135,6 +149,10 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     shader.setVec4("lightColor", params.color * params.intensity);
     shader.setVec3("lightPos", params.position);
     shader.setFloat("ambient", params.ambient);
+
+    // Texture / normal mapping toggles
+    shader.setBool("useTextures", params.useTextures);
+    shader.setBool("useNormalMap", params.useNormalMap);
 
     model.Draw(shader);
 }
@@ -184,9 +202,9 @@ int main() {
 
     Shader sceneShader("Shaders/scene.vert", "Shaders/scene.frag");
     sceneShader.Activate();
-    sceneShader.setBool("useTexture", false);
     sceneShader.setInt("diffuse0", 0);
     sceneShader.setInt("specular0", 1);
+    sceneShader.setInt("normal0", 2);
 
     //Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
 
