@@ -13,7 +13,7 @@ uniform sampler2D specular0; // texture unit for specular
 uniform float uvScale = 1.0;
 
 uniform vec4 lightColor; // Gets the color of the light
-uniform vec3 lightDir;   // Gets the direction of the light
+uniform vec3 lightPos;   // Gets the position of the light
 uniform vec3 camPos; // Gets the position of the camera
 
 uniform float ambient; // Ambient strength
@@ -24,13 +24,13 @@ uniform float shininess = 32.0f; // Shininess factor
 void main() {
     // Lighting Vectors
     vec3 N = normalize(normalWS);
-    vec3 L = normalize(-lightDir);
+    vec3 L = normalize(lightPos - currPos);
     vec3 V = normalize(camPos - currPos);
     vec3 H = normalize(L + V);  // Halfway vector for Blinn-Phong
 
     // Attenuation
-    //float distance = length(lightPos - currPos);
-    //float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
+    float distance = length(lightPos - currPos);
+    float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
         
     // Diffuse
     float diffuse = max(dot(N, L), 0.0);
@@ -46,7 +46,7 @@ void main() {
     // Combine
     vec3 result = (baseColor.rgb * (ambient + diffuse) + specularMap * specular) * lightColor.rgb;
 
-    //result *= attenuation;  // Apply distance falloff
+    result *= attenuation;  // Apply distance falloff
 
     fragColor = vec4(result, baseColor.a);
 }
