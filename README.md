@@ -1,1 +1,2 @@
-Assignment 1 demo link: https://www.youtube.com/watch?v=GB7XzMctEQk
+Assignment 1 demo link: https://youtu.be/GB7XzMctEQk?si=zIx7kkzKoRhVu-0T
+Assignment 2 demo link: https://youtu.be/OWwORPWgM6Q?si=ZxM_r1ZrvTLhmd-m
