@@ -10,14 +10,14 @@
 #include <engine/Camera.h>
 #include <engine/Texture.h>
 #include <engine/Mesh.h>
-#include <engine/Model.h>
 #include <engine/Shader.h>
+#include <engine/MathUtils.h>
 
 // skybox
-// #include <engine/HDRTexture.h>
-// #include <engine/Cubemap.h>
-// #include <engine/HDRConverter.h>
-// #include <engine/Skybox.h>
+#include <engine/HDRTexture.h>
+#include <engine/Cubemap.h>
+#include <engine/HDRConverter.h>
+#include <engine/Skybox.h>
 
 // imgui
 #include <imgui.h>
@@ -39,9 +39,16 @@ struct TweakableParams {
     glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
     float ambient = 0.25f;
 
+    // Specular
+    float specularStrength = 1.0f;
+    float roughnessBias = 0.0f;
+
     // Rendering toggles
     bool useTextures = false;
+
+    // Normal mapping
     bool useNormalMap = false;
+    float normalStrength = 1.0f;
 };
 
 // -------------------- Initialize GLFW --------------------
@@ -165,7 +172,7 @@ std::unique_ptr<Mesh> createSphereMesh() {
             vert.texUV = glm::vec2(uTex, vTex);
 
             glm::vec3 tangent = glm::normalize(glm::vec3(-st, 0.0f, ct)); // points in direction of increasing u
-            vert.tangent = tangent;
+            vert.tangent = glm::vec4(tangent, 1.0f);
 
             vertices.push_back(vert);
         }
@@ -205,16 +212,16 @@ std::unique_ptr<Mesh> initSphere(bool applyTextures, std::string texPath = "") {
 
     auto diffuse  = std::make_shared<Texture>((texPath + "/diffuse.png").c_str(), "diffuse",  0, GL_UNSIGNED_BYTE);    
     auto normal   = std::make_shared<Texture>((texPath + "/normal.png").c_str(),  "normal",   2, GL_UNSIGNED_BYTE);
-    auto specular = std::make_shared<Texture>((texPath + "/roughness.png").c_str(), "roughness", 3, GL_UNSIGNED_BYTE);
+    auto roughness = std::make_shared<Texture>((texPath + "/rough.png").c_str(), "roughness", 3, GL_UNSIGNED_BYTE);
     //auto ao       = std::make_shared<Texture>((texPath + "/ao.png").c_str(),         "ao",       5, GL_UNSIGNED_BYTE);
 
-    sphereMesh->textures = { diffuse, specular, normal /*, ao*/ };
+    sphereMesh->textures = { diffuse, normal, roughness  /*, ao*/ };
     std::cout << "[Sphere] Textures bound: " << sphereMesh->textures.size() << std::endl;
 
     return sphereMesh;
 }
 
-void renderSphere(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& params) {
+void renderSphere(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& params, float angle) {
     // Ensure correct depth state before drawing 3D geometry
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -299,18 +306,17 @@ int main() {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     // Load HDR texture for skybox
-    // HDRTexture hdri("Environment/skybox.hdr");
-    // Cubemap environment(512);
-	// HDRConverter converter(512);
-	// converter.convert(hdri, environment);
-	// Skybox skybox(environment);
+    HDRTexture hdri("Environment/skybox.hdr");
+    Cubemap environment(512);
+	HDRConverter converter(512);
+	converter.convert(hdri, environment);
+	Skybox skybox(environment);
 
 	// ------------ Load Shaders ------------
     std::cout << "Loading shaders..." << std::endl;
     Shader sceneShader("Shaders/scene.vert", "Shaders/scene.frag");
     Shader lightShader("Shaders/light.vert", "Shaders/light.frag");
-
-    //Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
+    Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
 
     // ------------ Setup Spheres ------------
 
@@ -330,14 +336,15 @@ int main() {
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = true;
     glm::vec3 target(0.0f, 0.0f, 0.0f);
-    float animTime = 0.0f;
-    glm::quat aircraftQuat = glm::quat(1, 0, 0, 0);
+    float angle = 0.0f;
+    float rotationSpeed = 20.0f; // radians per second
 	std::cout << "Entering render loop..." << std::endl;
     // this loop will run until we close window
     while (!glfwWindowShouldClose(window)) {
         float now = (float)glfwGetTime();
         float dt = now - prevTime;
         prevTime = now;
+        angle = now * rotationSpeed;
 
         // Start ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -361,11 +368,11 @@ int main() {
         camera.updateMatrix(0.5f, 100.0f);
 
         renderLightGizmo(*lightGizmo, lightShader, camera, params);
-        renderSphere(*brickSphere, sceneShader, camera, params);
+        renderSphere(*brickSphere, sceneShader, camera, params, angle);
 
         // Render skybox last
-        // skyboxShader.Activate();
-		// skybox.Draw(camera, skyboxShader);
+        skyboxShader.Activate();
+		skybox.Draw(camera, skyboxShader);
 
         // Render ImGui
         ImGui::Render();
@@ -388,7 +395,8 @@ int main() {
     ImGui::DestroyContext();
 	// delete shader program
     sceneShader.Delete();
-    //skyboxShader.Delete();
+    lightShader.Delete();
+    skyboxShader.Delete();
     // deletes window before ending program
     glfwDestroyWindow(window);
     // terminate GLFW before ending program

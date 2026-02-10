@@ -24,7 +24,8 @@ uniform vec3 camPos; // Gets the position of the camera
 
 uniform float ambient; // Ambient strength
 uniform float specularStr = 2.5f; // Specular strength
-uniform float shininess = 16.0f; // Shininess factor
+uniform float roughnessBias = 0.0f; // Bias to adjust roughness
+uniform float normalStrength = 1.0f; // Strength of normal mapping
 
 
 void main() {
@@ -35,6 +36,8 @@ void main() {
         vec3 normalTS = texture(normal0, texCoord * uvScale).rgb;
         // Unpack from [0,1] to [-1,1]
         normalTS = normalTS * 2.0 - 1.0;
+        // Apply normal strength
+        normalTS *= normalStrength;
         // DirectX normal map fix
         normalTS.y = -normalTS.y;
         // Transform normal from tangent space to world space
@@ -51,13 +54,12 @@ void main() {
     float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
         
     // Base Color
-    vec4 baseColor = useTextures
-        ? texture(diffuse0, texCoord * uvScale)
-        : vec4(vertexColor, 1.0);
+    vec3 baseColor = useTextures
+        ? texture(diffuse0, texCoord * uvScale).rgb
+        : vertexColor;
 
-    // Diffuse
-    float NdotL = max(dot(N, L), 0.0);
-    vec3 diffuse = baseColor * NdotL;
+    // Diffuse component
+    vec3 diffuse = baseColor * max(dot(N, L), 0.0) * lightColor.rgb;
 
     // Roughness-driven specular
     float roughness = useTextures
@@ -78,6 +80,6 @@ void main() {
     result += specular * lightColor.rgb;
     result *= attenuation; // Apply distance falloff
 
-    fragColor = vec4(result, baseColor.a);
+    fragColor = vec4(result, 1.0);
     //fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
 }
