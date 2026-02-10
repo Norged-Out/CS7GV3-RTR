@@ -5,8 +5,7 @@
 */
 
 #include <iostream>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+#include <engine/AppSetup.h>
 #include <engine/Camera.h>
 #include <engine/Texture.h>
 #include <engine/Mesh.h>
@@ -55,82 +54,6 @@ struct TweakableParams {
     float normalStrength = 1.0f;
 };
 
-// -------------------- Initialize GLFW --------------------
-
-static GLFWwindow* initWindow(int width, int height, const char* title) {
-
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW!" << std::endl;
-        return nullptr;
-    }
-
-    // tell GLFW to use the core Version 3.3
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);
-    // error check
-    if (!window) {
-        std::cerr << "Failed to create window!" << std::endl;
-        glfwTerminate();
-        return nullptr;
-    }
-
-    // introduce window to current context
-    glfwMakeContextCurrent(window);
-    return window;
-
-}
-
-// function for resizing window
-static void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    // Make sure the viewport matches the new window dimensions
-    glViewport(0, 0, width, height);
-    // Update camera as well
-    Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
-    if (cam) cam->setSize(width, height);
-}
-
-// -------------------- Initialize GLAD --------------------
-
-static void setupOpenGL() {
-    // use GLAD to configure OpenGL
-    if (!gladLoadGL()) {
-        std::cerr << "Failed to initialize GLAD!" << std::endl;
-        return;
-    }
-    // specify window dimensions
-    glViewport(0, 0, width, height);
-    // Enable depth and backface culling
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-	glFrontFace(GL_CCW);
-}
-
-// -------------------- Initialize Camera --------------------
-
-static void setupCamera(GLFWwindow* window, Camera& camera) {
-    // attach camera pointer to window
-    glfwSetWindowUserPointer(window, &camera);
-    // register callback
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    // set scroll callback
-    glfwSetScrollCallback(window, [](GLFWwindow* win, double xoff, double yoff) {
-        // forward to camera
-        Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(win));
-        if (cam) cam->OnScroll(yoff);
-        });
-    // Point camera at scene center
-    glm::vec3 target(0.0f, 0.0f, 0.0f);
-    camera.Position = glm::vec3(0.0f, 0.0f, 5.0f);
-    glm::vec3 dir = glm::normalize(target - camera.Position);
-    camera.Orientation = dir;
-    camera.pitch = glm::degrees(asin(dir.y));
-    camera.yaw = glm::degrees(atan2(dir.z, dir.x));
-}
-
 // -------------------- GUI Setup --------------------
 
 static void buildGUI(TweakableParams& params) {
@@ -158,6 +81,16 @@ static void buildGUI(TweakableParams& params) {
 }
 
 // -------------------- Render Sphere --------------------
+
+const std::vector<std::shared_ptr<Texture>> loadPBRTextures(const std::string& texPath) {
+    std::cout << "[PBRTexture] Loading textures from: " << texPath << std::endl;
+
+    auto diffuse  = std::make_shared<Texture>((texPath + "/diffuse.png").c_str(), "diffuse",  0, GL_UNSIGNED_BYTE);    
+    auto normal   = std::make_shared<Texture>((texPath + "/normal.png").c_str(),  "normal",   2, GL_UNSIGNED_BYTE);
+    auto roughness = std::make_shared<Texture>((texPath + "/rough.png").c_str(), "roughness", 3, GL_UNSIGNED_BYTE);
+
+    return { diffuse, normal, roughness };
+}
 
 void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& params, glm::mat4 model ) {
     // Ensure correct depth state before drawing 3D geometry
@@ -228,24 +161,14 @@ int main() {
     // sanity check for smooth camera motion
     glfwSwapInterval(1);
 
-    // use GLAD to configure OpenGL
-    if (!gladLoadGL()) {
-        std::cerr << "Failed to initialize GLAD!" << std::endl;
-        return -1;
-    }
-    setupOpenGL();
+    if (!setupOpenGL()) return -1;
 
     // Creates camera object
     Camera camera(width, height, glm::vec3(0.0f, 0.0f, 2.0f));
 	setupCamera(window, camera);
 
     // Initialize ImGui
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    initImGui(window);
 
     // Load HDR texture for skybox
     HDRTexture hdri("Environment/skybox.hdr");
@@ -266,14 +189,16 @@ int main() {
     sceneShader.setInt("diffuse0", 0);
     sceneShader.setInt("normal0", 2);
     sceneShader.setInt("roughness0", 3);
-    //sceneShader.setInt("ao0", 5);
 
     std::cout << "Initializing sphere meshes..." << std::endl;
     
-    std::unique_ptr<Mesh> lightGizmo = Geometry::createTexturedSphere(false);
-    std::unique_ptr<Mesh> sphere1 = Geometry::createTexturedSphere(true, "Textures/brick");
-    std::unique_ptr<Mesh> sphere2 = Geometry::createTexturedSphere(true, "Textures/rock");
-    std::unique_ptr<Mesh> sphere3 = Geometry::createTexturedSphere(true, "Textures/wood");
+    auto lightGizmo = Geometry::createSphereMesh();
+    auto sphere1 = Geometry::createSphereMesh();
+    auto sphere2 = Geometry::createSphereMesh();
+    auto sphere3 = Geometry::createSphereMesh();
+    sphere1->setTextures(loadPBRTextures("Textures/brick"));
+    sphere2->setTextures(loadPBRTextures("Textures/rock"));
+    sphere3->setTextures(loadPBRTextures("Textures/wood"));
 
     float spacing = 2.2f;
     glm::mat4 m1(1.0f);
@@ -346,19 +271,13 @@ int main() {
     // ------------ Clean up ------------
     
     // Cleanup ImGui
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-	// delete shader program
+    // delete shader program
     sceneShader.Delete();
     lightShader.Delete();
     skyboxShader.Delete();
-    // deletes window before ending program
-    glfwDestroyWindow(window);
-    // terminate GLFW before ending program
-    glfwTerminate();
 
-
+    shutdownImGui();
+    shutdownWindow(window);
+    
     return 0;
-
 }
