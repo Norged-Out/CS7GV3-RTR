@@ -12,8 +12,9 @@ uniform bool useTextures = false; // Toggle texture usage
 uniform bool useNormalMap = false; // Toggle normal mapping
 
 uniform sampler2D diffuse0; // texture unit for diffuse
-uniform sampler2D specular0; // texture unit for specular
 uniform sampler2D normal0; // normal map
+uniform sampler2D roughness0; // texture unit for roughness
+//uniform sampler2D ao0; // texture unit for ambient occlusion
 
 uniform float uvScale = 1.0;
 
@@ -22,8 +23,8 @@ uniform vec3 lightPos;   // Gets the position of the light
 uniform vec3 camPos; // Gets the position of the camera
 
 uniform float ambient; // Ambient strength
-uniform float specularStr = 5.0f; // Specular strength
-uniform float shininess = 32.0f; // Shininess factor
+uniform float specularStr = 2.5f; // Specular strength
+uniform float shininess = 16.0f; // Shininess factor
 
 
 void main() {
@@ -49,26 +50,33 @@ void main() {
     float distance = length(lightPos - currPos);
     float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
         
-    // Diffuse
-    float diffuse = max(dot(N, L), 0.0);
-    
-    // Specular (Blinn-Phong using halfway vector)
-    float spec = pow(max(dot(N, H), 0.0), shininess);
-    float specular = specularStr * spec;
-    
-    // Texture sampling
+    // Base Color
     vec4 baseColor = useTextures
         ? texture(diffuse0, texCoord * uvScale)
         : vec4(vertexColor, 1.0);
 
-    float specularMap = useTextures
-        ? texture(specular0, texCoord * uvScale).r
+    // Diffuse
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 diffuse = baseColor * NdotL;
+
+    // Roughness-driven specular
+    float roughness = useTextures
+        ? texture(roughness0, texCoord * uvScale).r
         : 0.5;
+
+    float smoothness = 1.0 - roughness;
+
+    // map roughness -> shininess
+    float shininess = mix(8.0, 128.0, smoothness);
+    // Blinn-Phong specular
+    float spec = pow(max(dot(N, H), 0.0), shininess);
+    float specular = spec * specularStr * smoothness;
     
     // Combine
-    vec3 result = (baseColor.rgb * (ambient + diffuse) + specularMap * specular) * lightColor.rgb;
-
-    result *= attenuation;  // Apply distance falloff
+    vec3 result = baseColor * ambient;
+    result += diffuse;
+    result += specular * lightColor.rgb;
+    result *= attenuation; // Apply distance falloff
 
     fragColor = vec4(result, baseColor.a);
     //fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);

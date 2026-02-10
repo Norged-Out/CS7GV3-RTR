@@ -19,5 +19,9 @@ add_custom_command(TARGET app POST_BUILD
         ${CMAKE_SOURCE_DIR}/Models
         $<TARGET_FILE_DIR:app>/Models
 
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/Textures
+        $<TARGET_FILE_DIR:app>/Textures
+
     
 )

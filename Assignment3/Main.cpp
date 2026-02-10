@@ -8,6 +8,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <engine/Camera.h>
+#include <engine/Texture.h>
+#include <engine/Mesh.h>
 #include <engine/Model.h>
 #include <engine/Shader.h>
 
@@ -21,6 +23,9 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 // -------------------- Establish globals --------------------
 
@@ -131,10 +136,85 @@ static void buildGUI(TweakableParams& params) {
     ImGui::End();
 }
 
-// -------------------- Render Model --------------------
+// -------------------- Render Sphere --------------------
 
-static void renderModel(Model& model, Shader& shader, Camera& camera,
-    TweakableParams& params) {
+std::unique_ptr<Mesh> createSphereMesh() {
+    int stacks = 16;
+    int slices = 24;
+    std::vector<Vertex> vertices;
+    std::vector<GLuint>  indices;
+    vertices.reserve((stacks + 1) * (slices + 1));
+
+    // setup vertices for the sphere
+    for (int y = 0; y <= stacks; ++y) {
+        float vTex = (float) y / stacks; // vertical texture
+        float phi = vTex * (float) M_PI; // latitude 0..PI
+        float cp = cosf(phi), sp = sinf(phi);
+
+        for (int x = 0; x <= slices; ++x) {
+            float uTex = (float)x / slices; // horizontal texture
+            float theta = uTex * 2.0f * (float) M_PI; // longitude 0..2PI
+            float ct = cosf(theta), st = sinf(theta);
+
+            // unit sphere parametric form
+            glm::vec3 n = glm::vec3(ct * sp, cp, st * sp);
+            Vertex vert;
+            vert.position = n; // radius 1
+            vert.normal = n; // unit normal = position
+            vert.color = glm::vec3(1.0f);
+            vert.texUV = glm::vec2(uTex, vTex);
+
+            glm::vec3 tangent = glm::normalize(glm::vec3(-st, 0.0f, ct)); // points in direction of increasing u
+            vert.tangent = tangent;
+
+            vertices.push_back(vert);
+        }
+    }
+
+    // setup indices for the sphere
+    for (int y = 0; y < stacks; ++y) {
+        for (int x = 0; x < slices; ++x) {
+            int a = y * (slices + 1) + x; // current row
+            int b = (y + 1) * (slices + 1) + x; // next row
+            // two triangles per quad
+            indices.push_back(a);            
+            indices.push_back(a + 1);
+            indices.push_back(b);
+
+            indices.push_back(a + 1);
+            indices.push_back(b + 1);
+            indices.push_back(b);
+        }
+    }
+
+    std::vector<std::shared_ptr<Texture>> textures;
+    std::cout << "[Sphere] Vertices: " << vertices.size()
+          << " | Indices: " << indices.size() << std::endl;
+
+    return std::make_unique<Mesh>(vertices, indices, textures);
+}
+
+std::unique_ptr<Mesh> initSphere(bool applyTextures, std::string texPath = "") {
+    std::unique_ptr<Mesh> sphereMesh = createSphereMesh();
+    if (!applyTextures) {
+        sphereMesh->textures.clear();
+        return sphereMesh;
+    }
+
+    std::cout << "[Sphere] Loading textures from: " << texPath << std::endl;
+
+    auto diffuse  = std::make_shared<Texture>((texPath + "/diffuse.png").c_str(), "diffuse",  0, GL_UNSIGNED_BYTE);    
+    auto normal   = std::make_shared<Texture>((texPath + "/normal.png").c_str(),  "normal",   2, GL_UNSIGNED_BYTE);
+    auto specular = std::make_shared<Texture>((texPath + "/roughness.png").c_str(), "roughness", 3, GL_UNSIGNED_BYTE);
+    //auto ao       = std::make_shared<Texture>((texPath + "/ao.png").c_str(),         "ao",       5, GL_UNSIGNED_BYTE);
+
+    sphereMesh->textures = { diffuse, specular, normal /*, ao*/ };
+    std::cout << "[Sphere] Textures bound: " << sphereMesh->textures.size() << std::endl;
+
+    return sphereMesh;
+}
+
+void renderSphere(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& params) {
     // Ensure correct depth state before drawing 3D geometry
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -143,6 +223,9 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     // Set shader uniforms
     shader.Activate();
     camera.Matrix(shader, "camMatrix");
+
+    glm::mat4 model = glm::mat4(1.0f);
+    shader.setMat4("model", model);
 
     // Controllable uniforms
     shader.setVec3("camPos", camera.Position);
@@ -154,7 +237,32 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
 
-    model.Draw(shader);
+    static bool once = true;
+    if (once) {
+        std::cout << "[Render] Sphere draw call hit | useTex=" << params.useTextures
+                  << " useNrm=" << params.useNormalMap << "\n";
+        once = false;
+    }
+
+    mesh.Draw(shader);
+}
+
+
+void renderLightGizmo(Mesh& mesh, Shader& shader, Camera& camera, const TweakableParams& params) {
+    shader.Activate();
+    camera.Matrix(shader, "camMatrix");
+
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, params.position);
+    float s = 0.1f + 0.02f * sin(glfwGetTime() * 4.0f);
+    model = glm::scale(model, glm::vec3(s));
+
+    shader.setMat4("model", model);
+    shader.setVec4("lightColor", params.color);
+
+    glDisable(GL_CULL_FACE);   // optional, makes it always visible
+    mesh.Draw(shader);
+    glEnable(GL_CULL_FACE);
 }
 
 // -------------------- Main --------------------
@@ -199,26 +307,23 @@ int main() {
 
 	// ------------ Load Shaders ------------
     std::cout << "Loading shaders..." << std::endl;
-
     Shader sceneShader("Shaders/scene.vert", "Shaders/scene.frag");
-    sceneShader.Activate();
-    sceneShader.setInt("diffuse0", 0);
-    sceneShader.setInt("specular0", 1);
-    sceneShader.setInt("normal0", 2);
+    Shader lightShader("Shaders/light.vert", "Shaders/light.frag");
 
     //Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
 
-    // ------------ Load Models ------------
-    std::cout << "Loading models..." << std::endl;
+    // ------------ Setup Spheres ------------
 
-	// attempt to load model
-    float t0 = (float)glfwGetTime();
-    Model model1("Models/teapot/teapot.fbx");
-    float t1 = (float)glfwGetTime();
-    std::cout << "[Load] Model took " << (t1 - t0) << "s\n";
+    sceneShader.Activate();
+    sceneShader.setInt("diffuse0", 0);
+    sceneShader.setInt("normal0", 2);
+    sceneShader.setInt("roughness0", 3);
+    //sceneShader.setInt("ao0", 5);
 
-	model1.setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-    model1.setScale(glm::vec3(1.0f));
+    std::cout << "Initializing sphere meshes..." << std::endl;
+    
+    std::unique_ptr<Mesh> lightGizmo = initSphere(false);
+    std::unique_ptr<Mesh> brickSphere = initSphere(true, "Textures/brick");
 
     // ------------ Render Loop ------------
     TweakableParams params;
@@ -254,9 +359,9 @@ int main() {
         // Updates and exports the camera matrix to the Vertex Shader
         camera.UpdateWithMode(window, dt);
         camera.updateMatrix(0.5f, 100.0f);
-        
-        // Render the model with current parameters
-        renderModel(model1, sceneShader, camera, params);
+
+        renderLightGizmo(*lightGizmo, lightShader, camera, params);
+        renderSphere(*brickSphere, sceneShader, camera, params);
 
         // Render skybox last
         // skyboxShader.Activate();
