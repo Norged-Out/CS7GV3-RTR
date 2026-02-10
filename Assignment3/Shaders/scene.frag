@@ -37,9 +37,11 @@ void main() {
         // Unpack from [0,1] to [-1,1]
         normalTS = normalTS * 2.0 - 1.0;
         // Apply normal strength
-        normalTS *= normalStrength;
+        normalTS.xy *= normalStrength;
         // DirectX normal map fix
         normalTS.y = -normalTS.y;
+        // Re-normalize after strength adjustment
+        normalTS = normalize(normalTS);
         // Transform normal from tangent space to world space
         N = normalize(TBN * normalTS);
     }
@@ -66,6 +68,7 @@ void main() {
         ? texture(roughness0, texCoord * uvScale).r
         : 0.5;
 
+    roughness = clamp(roughness + roughnessBias, 0.0, 1.0);
     float smoothness = 1.0 - roughness;
 
     // map roughness -> shininess
