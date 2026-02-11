@@ -52,12 +52,13 @@ struct TweakableParams {
     // Normal mapping
     bool useNormalMap = false;
     float normalStrength = 1.0f;
+    bool debugNormals = false;
 };
 
 // -------------------- GUI Setup --------------------
 
 static void buildGUI(TweakableParams& params) {
-    ImGui::Begin("Rotations Controls");
+    ImGui::Begin("Shader Controls");
     ImGui::SliderFloat("Light Intensity", &params.intensity, 0.5f, 5.0f);
     ImGui::SliderFloat("Ambient", &params.ambient, 0.0f, 1.0f);
     ImGui::ColorEdit3("Light Color", &params.color.r);
@@ -75,6 +76,7 @@ static void buildGUI(TweakableParams& params) {
     ImGui::Separator();
     ImGui::Checkbox("Use Textures", &params.useTextures);
     ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
+    ImGui::Checkbox("Debug: World Normals", &params.debugNormals);
     ImGui::SliderFloat("Normal Strength", &params.normalStrength, 0.0f, 2.0f);
 
     ImGui::End();
@@ -117,6 +119,7 @@ void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& par
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
+    shader.setBool("debugNormals", params.debugNormals);
 
     mesh.Draw(shader);
 }
@@ -150,12 +153,12 @@ void renderLightGizmo(Mesh& mesh, Shader& shader, Camera& camera, TweakableParam
 // -------------------- Main --------------------
 
 int main() {
-    std::cout << "Testing" << std::endl;
+    std::cout << "Assignment 3: Normal Mapping" << std::endl;
 
     // ------------ Initialize the Window ------------
 
-    // create a window of 800x800 size
-    GLFWwindow* window = initWindow(width, height, "Testing");
+    // create a window
+    GLFWwindow* window = initWindow(width, height, "Assignment 3: Normal Mapping");
     if (!window) return -1;
 
     // sanity check for smooth camera motion

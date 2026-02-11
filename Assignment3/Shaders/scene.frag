@@ -10,11 +10,11 @@ out vec4 fragColor;
 
 uniform bool useTextures = false; // Toggle texture usage
 uniform bool useNormalMap = false; // Toggle normal mapping
+uniform bool debugNormals = false; 
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
 uniform sampler2D roughness0; // texture unit for roughness
-//uniform sampler2D ao0; // texture unit for ambient occlusion
 
 uniform float uvScale = 1.0;
 
@@ -44,6 +44,11 @@ void main() {
         normalTS = normalize(normalTS);
         // Transform normal from tangent space to world space
         N = normalize(TBN * normalTS);
+    }
+    // Debug normal visualization
+    if (debugNormals){
+        fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+        return;
     }
 
     // Lighting Vectors
@@ -84,5 +89,4 @@ void main() {
     result *= attenuation; // Apply distance falloff
 
     fragColor = vec4(result, 1.0);
-    //fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
 }
