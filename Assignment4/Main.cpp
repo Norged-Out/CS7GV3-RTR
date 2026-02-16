@@ -43,18 +43,8 @@ struct TweakableParams {
     float orbitRadius = 5.0f;
     float orbitSpeed = 0.5f; // radians/sec
 
-    // Specular
-    float specularStrength = 1.0f;
-    float roughnessBias = 0.0f;
-
-    // Rendering toggles
-    bool useTextures = false;
-
-    // Normal mapping
-    bool useNormalMap = false;
-    float normalStrength = 1.0f;
-
-    // Texture parameters
+    // Texture parameters    
+    bool useTextures = true;
     int minFilterMode = 5; // default trilinear
     int magFilterMode = 1; // default linear
     int wrapMode = 0;      // default repeat
@@ -75,25 +65,17 @@ static void buildGUI(TweakableParams& params) {
     ImGui::SliderFloat("Orbit Speed", &params.orbitSpeed, 0.1f, 1.0f);
 
     ImGui::Separator();
-    ImGui::SliderFloat("Specular Strength", &params.specularStrength, 0.0f, 5.0f);
-    ImGui::SliderFloat("Roughness Bias", &params.roughnessBias, -1.0f, 1.0f);
-
-    ImGui::Separator();
+    ImGui::Text("Texture Sampling");    
     ImGui::Checkbox("Use Textures", &params.useTextures);
-    ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
-    ImGui::SliderFloat("Normal Strength", &params.normalStrength, 0.0f, 2.0f);
-
-    ImGui::Separator();
-    ImGui::Text("Texture Sampling");
 
     // Minification filter options
     const char* minModes[] = {
-        "Nearest",
-        "Linear",
-        "Blocky Mipmap",
-        "Linear Mipmap",
-        "Blended Mipmap",
-        "Trilinear"
+        "Nearest (No Mipmaps)",
+        "Linear (No Mipmaps)",
+        "Nearest Mipmap Nearest",
+        "Linear Mipmap Nearest",
+        "Nearest Mipmap Linear",
+        "Trilinear (Linear Mipmap Linear)"
     };
     ImGui::Combo("Min Filter", &params.minFilterMode, minModes, IM_ARRAYSIZE(minModes));
 
@@ -107,8 +89,8 @@ static void buildGUI(TweakableParams& params) {
     // Wrap mode options
     const char* wrapModes[] = {
         "Repeat",
-        "Clamp to Edge",
-        "Mirrored Repeat"
+        "Mirrored Repeat",
+        "Clamp to Edge"
     };
     ImGui::Combo("Wrap Mode", &params.wrapMode, wrapModes, IM_ARRAYSIZE(wrapModes));
 
@@ -118,7 +100,7 @@ static void buildGUI(TweakableParams& params) {
 // -------------------- Texture Controls --------------------
 
 void updateTextureParams(TweakableParams& params, 
-    const std::vector<std::shared_ptr<Material>>& mats) {
+    const std::shared_ptr<Material> mat) {
     static int prevMin = -1;
     static int prevMag = -1;
     static int prevWrap = -1;
@@ -144,14 +126,14 @@ void updateTextureParams(TweakableParams& params,
     }
     switch(params.wrapMode) {
         case 0: wrapMode = GL_REPEAT; break;
-        case 1: wrapMode = GL_CLAMP_TO_EDGE; break;
-        case 2: wrapMode = GL_MIRRORED_REPEAT; break;
+        case 1: wrapMode = GL_MIRRORED_REPEAT; break;
+        case 2: wrapMode = GL_CLAMP_TO_EDGE; break;
         default: wrapMode = GL_REPEAT;
     }
-    for (auto& mat : mats) {
-        mat->setFiltering(minFilter, magFilter);
-        mat->setWrapping(wrapMode, wrapMode);
-    }
+    
+    mat->setFiltering(minFilter, magFilter);
+    mat->setWrapping(wrapMode, wrapMode);
+
     prevMin = params.minFilterMode;
     prevMag = params.magFilterMode;
     prevWrap = params.wrapMode;
@@ -176,14 +158,8 @@ void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& par
     shader.setVec4("lightColor", params.color * params.intensity);
     shader.setFloat("ambient", params.ambient);
 
-    // Material
-    shader.setFloat("specularStr", params.specularStrength);
-    shader.setFloat("roughnessBias", params.roughnessBias);
-    shader.setFloat("normalStrength", params.normalStrength);
-
     // Toggles
     shader.setBool("useTextures", params.useTextures);
-    shader.setBool("useNormalMap", params.useNormalMap);
 
     mesh.Draw(shader);
 }
@@ -250,39 +226,38 @@ int main() {
     Shader lightShader("Shaders/light.vert", "Shaders/light.frag");
     Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
 
-    // ------------ Setup Spheres ------------
+    // ------------ Setup Geometry ------------
 
     sceneShader.Activate();
 
-    std::cout << "Initializing sphere meshes..." << std::endl;
+    std::cout << "Initializing custom meshes..." << std::endl;
     
-    auto lightGizmo = Geometry::createSphereMesh();
-    auto sphere1 = Geometry::createSphereMesh();
-    auto sphere2 = Geometry::createSphereMesh();
-    auto sphere3 = Geometry::createSphereMesh();
-    auto brickMat = Material::CreateMat(
-        "Textures/brick/diffuse.png",
-        "Textures/brick/normal.png",
-        "Textures/brick/rough.png"
-    );
-    auto rockMat = Material::CreateMat(
-        "Textures/rock/diffuse.png",
-        "Textures/rock/normal.png",
-        "Textures/rock/rough.png"
-    );
-    auto woodMat = Material::CreateMat(
-        "Textures/wood/diffuse.png",
-        "Textures/wood/normal.png",
-        "Textures/wood/rough.png"
-    );
-    sphere1->setMaterial(brickMat);
-    sphere2->setMaterial(rockMat);
-    sphere3->setMaterial(woodMat);
+    auto lightGizmo = Geometry::createSphereMesh(16, 16, false);
+    auto cube = Geometry::createCubeMesh();
+    auto sphere = Geometry::createSphereMesh();
+    auto pyramid = Geometry::createPyramidMesh();
+    auto plane = Geometry::createPlaneMesh(200.0f, 200.0f, 100.0f);
 
-    float spacing = 2.2f;
-    glm::mat4 m1(1.0f);
-    glm::mat4 m2(1.0f);
-    glm::mat4 m3(1.0f);
+    auto pebbleMat = Material::CreateMat(
+        "Textures/pebble/diffuse.png",
+        "Textures/pebble/normal.png",
+        "Textures/pebble/rough.png"
+    );
+    cube->setMaterial(pebbleMat);
+    sphere->setMaterial(pebbleMat);
+    pyramid->setMaterial(pebbleMat);
+    plane->setMaterial(pebbleMat);
+
+    float spacing = 3.5f;
+    glm::mat4 cubeModel(1.0f);
+    glm::mat4 sphereModel(1.0f);
+    glm::mat4 pyramidModel(1.0f);
+
+    glm::mat4 planeModel = MathUtils::buildTRS(
+        glm::vec3(0.0f, -1.0f, 0.0f),
+        glm::vec3(1,0,0), 0.0f,
+        glm::vec3(1.0f)
+    );
 
     // ------------ Render Loop ------------
     TweakableParams params;
@@ -306,8 +281,8 @@ int main() {
         buildGUI(params);
 
         
-        updateTextureParams(params, { brickMat, rockMat, woodMat });
-        
+        updateTextureParams(params, pebbleMat);
+
         // clear the screen and specify background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         // clean back buffer and depth buffer
@@ -323,15 +298,30 @@ int main() {
         camera.UpdateWithMode(window, dt);
         camera.updateMatrix(0.5f, 100.0f);
 
-        // Build model matrices for spheres
-        m1 = MathUtils::buildTRS(glm::vec3(-spacing, 0.0f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(1.0f));
-        m2 = MathUtils::buildTRS(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(1.0f));
-        m3 = MathUtils::buildTRS(glm::vec3(spacing, 0.0f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(1.0f));
+        // Render plane
+        renderMesh(*plane, sceneShader, camera, params, planeModel);
+
+        // Build model matrices for rotating objects
+        cubeModel = MathUtils::buildTRS(
+            glm::vec3(-spacing, 1.0f, 0.0f), 
+            glm::vec3(0.5,1,-0.5), angle, 
+            glm::vec3(1.5f)
+        );
+        sphereModel = MathUtils::buildTRS(
+            glm::vec3(0.0f, 1.0f, 0.0f), 
+            glm::vec3(0,-1,0), angle, 
+            glm::vec3(1.0f)
+        );
+        pyramidModel = MathUtils::buildTRS(
+            glm::vec3(spacing, 1.0f, 0.0f), 
+            glm::vec3(0,1,0), angle, 
+            glm::vec3(2.0f)
+        );
 
         renderLightGizmo(*lightGizmo, lightShader, camera, params);
-        renderMesh(*sphere1, sceneShader, camera, params, m1);
-        renderMesh(*sphere2, sceneShader, camera, params, m2);
-        renderMesh(*sphere3, sceneShader, camera, params, m3);
+        renderMesh(*cube, sceneShader, camera, params, cubeModel);
+        renderMesh(*sphere, sceneShader, camera, params, sphereModel);
+        renderMesh(*pyramid, sceneShader, camera, params, pyramidModel);
 
         // Render skybox last
         skyboxShader.Activate();

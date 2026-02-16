@@ -8,8 +8,8 @@ in mat3 TBN;           // Receive tangent-space basis from vertex shader
 
 out vec4 fragColor;
 
-uniform bool useTextures = false; // Toggle texture usage
-uniform bool useNormalMap = false; // Toggle normal mapping
+uniform bool useTextures = true; // Toggle texture usage
+uniform bool useNormalMap = true; // Toggle normal mapping
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
@@ -24,7 +24,6 @@ uniform vec3 camPos; // Gets the position of the camera
 uniform float ambient; // Ambient strength
 uniform float specularStr = 2.5f; // Specular strength
 uniform float roughnessBias = 0.0f; // Bias to adjust roughness
-uniform float normalStrength = 1.0f; // Strength of normal mapping
 
 
 void main() {
@@ -35,20 +34,11 @@ void main() {
         vec3 normalTS = texture(normal0, texCoord * uvScale).rgb;
         // Unpack from [0,1] to [-1,1]
         normalTS = normalTS * 2.0 - 1.0;
-        // Apply normal strength
-        normalTS.xy *= normalStrength;
         // DirectX normal map fix
         normalTS.y = -normalTS.y;
-        // Re-normalize after strength adjustment
-        normalTS = normalize(normalTS);
         // Transform normal from tangent space to world space
         N = normalize(TBN * normalTS);
     }
-    // Debug normal visualization
-    // if (debugNormals){
-    //     fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
-    //     return;
-    // }
 
     // Lighting Vectors
     vec3 L = normalize(lightPos - currPos);
@@ -83,9 +73,7 @@ void main() {
     
     // Combine
     vec3 result = baseColor * ambient;
-    result += diffuse;
-    result += specular * lightColor.rgb;
-    result *= attenuation; // Apply distance falloff
+    result += (diffuse + specular * lightColor.rgb) * attenuation; // Apply distance falloff
 
     fragColor = vec4(result, 1.0);
 }
