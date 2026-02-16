@@ -10,7 +10,6 @@ out vec4 fragColor;
 
 uniform bool useTextures = false; // Toggle texture usage
 uniform bool useNormalMap = false; // Toggle normal mapping
-uniform bool debugNormals = false; 
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
@@ -46,10 +45,10 @@ void main() {
         N = normalize(TBN * normalTS);
     }
     // Debug normal visualization
-    if (debugNormals){
-        fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
-        return;
-    }
+    // if (debugNormals){
+    //     fragColor = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+    //     return;
+    // }
 
     // Lighting Vectors
     vec3 L = normalize(lightPos - currPos);

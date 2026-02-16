@@ -1,6 +1,6 @@
 /*
 * Author: Priyansh Nayak
-* Project: Normal Mapping
+* Project: Mipmaps
 * Course: CS7GV3: Real-Time Rendering
 */
 
@@ -8,6 +8,7 @@
 #include <engine/AppSetup.h>
 #include <engine/Camera.h>
 #include <engine/Texture.h>
+#include <engine/Material.h>
 #include <engine/Mesh.h>
 #include <engine/Shader.h>
 #include <engine/MathUtils.h>
@@ -52,13 +53,17 @@ struct TweakableParams {
     // Normal mapping
     bool useNormalMap = false;
     float normalStrength = 1.0f;
-    bool debugNormals = false;
+
+    // Texture parameters
+    int minFilterMode = 5; // default trilinear
+    int magFilterMode = 1; // default linear
+    int wrapMode = 0;      // default repeat
 };
 
 // -------------------- GUI Setup --------------------
 
 static void buildGUI(TweakableParams& params) {
-    ImGui::Begin("Shader Controls");
+    ImGui::Begin("Controls");
     ImGui::SliderFloat("Light Intensity", &params.intensity, 0.5f, 5.0f);
     ImGui::SliderFloat("Ambient", &params.ambient, 0.0f, 1.0f);
     ImGui::ColorEdit3("Light Color", &params.color.r);
@@ -76,10 +81,80 @@ static void buildGUI(TweakableParams& params) {
     ImGui::Separator();
     ImGui::Checkbox("Use Textures", &params.useTextures);
     ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
-    ImGui::Checkbox("Debug: World Normals", &params.debugNormals);
     ImGui::SliderFloat("Normal Strength", &params.normalStrength, 0.0f, 2.0f);
 
+    ImGui::Separator();
+    ImGui::Text("Texture Sampling");
+
+    // Minification filter options
+    const char* minModes[] = {
+        "Nearest",
+        "Linear",
+        "Blocky Mipmap",
+        "Linear Mipmap",
+        "Blended Mipmap",
+        "Trilinear"
+    };
+    ImGui::Combo("Min Filter", &params.minFilterMode, minModes, IM_ARRAYSIZE(minModes));
+
+    // Magnification filter options
+    const char* magModes[] = {
+        "Nearest",
+        "Linear"
+    };
+    ImGui::Combo("Mag Filter", &params.magFilterMode, magModes, IM_ARRAYSIZE(magModes));
+
+    // Wrap mode options
+    const char* wrapModes[] = {
+        "Repeat",
+        "Clamp to Edge",
+        "Mirrored Repeat"
+    };
+    ImGui::Combo("Wrap Mode", &params.wrapMode, wrapModes, IM_ARRAYSIZE(wrapModes));
+
     ImGui::End();
+}
+
+// -------------------- Texture Controls --------------------
+
+void updateTextureParams(TweakableParams& params, 
+    const std::vector<std::shared_ptr<Material>>& mats) {
+    static int prevMin = -1;
+    static int prevMag = -1;
+    static int prevWrap = -1;
+
+    // Guard against no change
+    if (params.minFilterMode == prevMin && params.magFilterMode == prevMag && params.wrapMode == prevWrap)
+        return;
+    
+    GLenum minFilter, magFilter, wrapMode;
+    switch(params.minFilterMode) {
+        case 0: minFilter = GL_NEAREST; break;
+        case 1: minFilter = GL_LINEAR; break;
+        case 2: minFilter = GL_NEAREST_MIPMAP_NEAREST; break;
+        case 3: minFilter = GL_LINEAR_MIPMAP_NEAREST; break;
+        case 4: minFilter = GL_NEAREST_MIPMAP_LINEAR; break;
+        case 5: minFilter = GL_LINEAR_MIPMAP_LINEAR; break;
+        default: minFilter = GL_LINEAR_MIPMAP_LINEAR;
+    }
+    switch(params.magFilterMode) {
+        case 0: magFilter = GL_NEAREST; break;
+        case 1: magFilter = GL_LINEAR; break;
+        default: magFilter = GL_LINEAR;
+    }
+    switch(params.wrapMode) {
+        case 0: wrapMode = GL_REPEAT; break;
+        case 1: wrapMode = GL_CLAMP_TO_EDGE; break;
+        case 2: wrapMode = GL_MIRRORED_REPEAT; break;
+        default: wrapMode = GL_REPEAT;
+    }
+    for (auto& mat : mats) {
+        mat->setFiltering(minFilter, magFilter);
+        mat->setWrapping(wrapMode, wrapMode);
+    }
+    prevMin = params.minFilterMode;
+    prevMag = params.magFilterMode;
+    prevWrap = params.wrapMode;
 }
 
 // -------------------- Render Sphere --------------------
@@ -109,7 +184,6 @@ void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& par
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
-    shader.setBool("debugNormals", params.debugNormals);
 
     mesh.Draw(shader);
 }
@@ -143,12 +217,12 @@ void renderLightGizmo(Mesh& mesh, Shader& shader, Camera& camera, TweakableParam
 // -------------------- Main --------------------
 
 int main() {
-    std::cout << "Assignment 3: Normal Mapping" << std::endl;
+    std::cout << "Assignment 4: Mipmaps" << std::endl;
 
     // ------------ Initialize the Window ------------
 
     // create a window
-    GLFWwindow* window = initWindow(width, height, "Assignment 3: Normal Mapping");
+    GLFWwindow* window = initWindow(width, height, "Assignment 4: Mipmaps");
     if (!window) return -1;
 
     // sanity check for smooth camera motion
@@ -179,9 +253,6 @@ int main() {
     // ------------ Setup Spheres ------------
 
     sceneShader.Activate();
-    sceneShader.setInt("diffuse0", 0);
-    sceneShader.setInt("normal0", 2);
-    sceneShader.setInt("roughness0", 3);
 
     std::cout << "Initializing sphere meshes..." << std::endl;
     
@@ -234,6 +305,9 @@ int main() {
         ImGui::NewFrame();
         buildGUI(params);
 
+        
+        updateTextureParams(params, { brickMat, rockMat, woodMat });
+        
         // clear the screen and specify background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
         // clean back buffer and depth buffer
