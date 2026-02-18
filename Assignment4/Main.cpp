@@ -1,6 +1,6 @@
 /*
 * Author: Priyansh Nayak
-* Project: Mipmaps
+* Project: Mipmapping
 * Course: CS7GV3: Real-Time Rendering
 */
 
@@ -35,19 +35,20 @@ const unsigned int height = 800;
 
 struct TweakableParams {
     // Light parameters
-    float intensity = 1.0f;
-    glm::vec3 position = glm::vec3(0.0f, 3.0f, 3.0f);
+    float intensity = 2.0f;
+    glm::vec3 position = glm::vec3(0.0f, 8.0f, 5.0f);
     glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
-    float ambient = 0.25f;
-    bool orbitLight = false;
-    float orbitRadius = 5.0f;
+    float ambient = 0.5f;
+    bool orbitLight = true;
+    float orbitRadius = 10.0f;
     float orbitSpeed = 0.5f; // radians/sec
 
     // Texture parameters    
     bool useTextures = true;
     int minFilterMode = 5; // default trilinear
-    int magFilterMode = 1; // default linear
     int wrapMode = 0;      // default repeat
+    int textureIndex = 0;
+    float uvScale = 1.0f;
 };
 
 // -------------------- GUI Setup --------------------
@@ -61,14 +62,23 @@ static void buildGUI(TweakableParams& params) {
 
     ImGui::Separator();
     ImGui::Checkbox("Orbit Light", &params.orbitLight);
-    ImGui::SliderFloat("Orbit Radius", &params.orbitRadius, 1.0f, 10.0f);
+    ImGui::SliderFloat("Orbit Radius", &params.orbitRadius, 1.0f, 20.0f);
     ImGui::SliderFloat("Orbit Speed", &params.orbitSpeed, 0.1f, 1.0f);
 
     ImGui::Separator();
     ImGui::Text("Texture Sampling");    
     ImGui::Checkbox("Use Textures", &params.useTextures);
 
-    // Minification filter options
+    // Texture set selector
+    const char* texSets[] = {
+        "Checkerboard",
+        "Multilights",
+        "Brick",
+        "Newspaper"
+    };
+    ImGui::Combo("Texture Set", &params.textureIndex, texSets, IM_ARRAYSIZE(texSets));
+
+    // Minmap filter options
     const char* minModes[] = {
         "Nearest (No Mipmaps)",
         "Linear (No Mipmaps)",
@@ -79,13 +89,6 @@ static void buildGUI(TweakableParams& params) {
     };
     ImGui::Combo("Min Filter", &params.minFilterMode, minModes, IM_ARRAYSIZE(minModes));
 
-    // Magnification filter options
-    const char* magModes[] = {
-        "Nearest",
-        "Linear"
-    };
-    ImGui::Combo("Mag Filter", &params.magFilterMode, magModes, IM_ARRAYSIZE(magModes));
-
     // Wrap mode options
     const char* wrapModes[] = {
         "Repeat",
@@ -93,23 +96,45 @@ static void buildGUI(TweakableParams& params) {
         "Clamp to Edge"
     };
     ImGui::Combo("Wrap Mode", &params.wrapMode, wrapModes, IM_ARRAYSIZE(wrapModes));
+    ImGui::SliderFloat("UV Scale", &params.uvScale, 1.0f, 500.0f);
 
     ImGui::End();
 }
 
 // -------------------- Texture Controls --------------------
 
+void createMaterials(std::vector<std::shared_ptr<Material>>& mats){
+    const char* normalPath = "Textures/normal.png";
+    const char* roughPath  = "Textures/rough.png";
+    std::vector<std::string> diffusePaths = {
+        "Textures/checker.png",
+        "Textures/multilights.png",
+        "Textures/bricks.png",
+        "Textures/newspaper.png"
+    };
+
+    for (auto path : diffusePaths) {
+        auto mat = std::make_shared<Material>();
+        mat->setTexture("diffuse", std::make_shared<Texture>(
+            path.c_str(),
+            GL_UNSIGNED_BYTE));
+        mat->setTexture("normal", std::make_shared<Texture>(normalPath, GL_UNSIGNED_BYTE));
+        mat->setTexture("roughness", std::make_shared<Texture>(roughPath, GL_UNSIGNED_BYTE));
+        mats.push_back(mat);
+    }
+}
+
 void updateTextureParams(TweakableParams& params, 
     const std::shared_ptr<Material> mat) {
     static int prevMin = -1;
-    static int prevMag = -1;
     static int prevWrap = -1;
+    static std::shared_ptr<Material> prevMat = nullptr;
 
     // Guard against no change
-    if (params.minFilterMode == prevMin && params.magFilterMode == prevMag && params.wrapMode == prevWrap)
+    if (params.minFilterMode == prevMin && params.wrapMode == prevWrap && mat == prevMat)
         return;
     
-    GLenum minFilter, magFilter, wrapMode;
+    GLenum minFilter, wrapMode;
     switch(params.minFilterMode) {
         case 0: minFilter = GL_NEAREST; break;
         case 1: minFilter = GL_LINEAR; break;
@@ -119,11 +144,6 @@ void updateTextureParams(TweakableParams& params,
         case 5: minFilter = GL_LINEAR_MIPMAP_LINEAR; break;
         default: minFilter = GL_LINEAR_MIPMAP_LINEAR;
     }
-    switch(params.magFilterMode) {
-        case 0: magFilter = GL_NEAREST; break;
-        case 1: magFilter = GL_LINEAR; break;
-        default: magFilter = GL_LINEAR;
-    }
     switch(params.wrapMode) {
         case 0: wrapMode = GL_REPEAT; break;
         case 1: wrapMode = GL_MIRRORED_REPEAT; break;
@@ -131,12 +151,12 @@ void updateTextureParams(TweakableParams& params,
         default: wrapMode = GL_REPEAT;
     }
     
-    mat->setFiltering(minFilter, magFilter);
+    mat->setFiltering(minFilter, GL_LINEAR); // Default mag filter is linear
     mat->setWrapping(wrapMode, wrapMode);
 
     prevMin = params.minFilterMode;
-    prevMag = params.magFilterMode;
     prevWrap = params.wrapMode;
+    prevMat = mat;
 }
 
 // -------------------- Render Sphere --------------------
@@ -160,6 +180,7 @@ void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakableParams& par
 
     // Toggles
     shader.setBool("useTextures", params.useTextures);
+    shader.setFloat("uvScale", params.uvScale);
 
     mesh.Draw(shader);
 }
@@ -238,17 +259,17 @@ int main() {
     auto pyramid = Geometry::createPyramidMesh();
     auto plane = Geometry::createPlaneMesh(200.0f, 200.0f, 100.0f);
 
-    auto pebbleMat = Material::CreateMat(
-        "Textures/pebble/diffuse.png",
-        "Textures/pebble/normal.png",
-        "Textures/pebble/rough.png"
-    );
-    cube->setMaterial(pebbleMat);
-    sphere->setMaterial(pebbleMat);
-    pyramid->setMaterial(pebbleMat);
-    plane->setMaterial(pebbleMat);
+    std::vector<std::shared_ptr<Material>> mats;
+    createMaterials(mats);
 
-    float spacing = 3.5f;
+    // Start material
+    auto activeMat = mats[0];
+    cube->setMaterial(activeMat);
+    sphere->setMaterial(activeMat);
+    pyramid->setMaterial(activeMat);
+    plane->setMaterial(activeMat);
+
+    float spacing = 10.0f;
     glm::mat4 cubeModel(1.0f);
     glm::mat4 sphereModel(1.0f);
     glm::mat4 pyramidModel(1.0f);
@@ -280,8 +301,18 @@ int main() {
         ImGui::NewFrame();
         buildGUI(params);
 
+        // Cycle through materials based on GUI selection
+        static int prevTexIndex = -1;
+        if (params.textureIndex != prevTexIndex) {
+            activeMat = mats[params.textureIndex];
+            cube->setMaterial(activeMat);
+            sphere->setMaterial(activeMat);
+            pyramid->setMaterial(activeMat);
+            plane->setMaterial(activeMat);
+            prevTexIndex = params.textureIndex;
+        }
         
-        updateTextureParams(params, pebbleMat);
+        updateTextureParams(params, activeMat);
 
         // clear the screen and specify background color
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
@@ -305,17 +336,17 @@ int main() {
         cubeModel = MathUtils::buildTRS(
             glm::vec3(-spacing, 1.0f, 0.0f), 
             glm::vec3(0.5,1,-0.5), angle, 
-            glm::vec3(1.5f)
+            glm::vec3(3.0f)
         );
         sphereModel = MathUtils::buildTRS(
             glm::vec3(0.0f, 1.0f, 0.0f), 
             glm::vec3(0,-1,0), angle, 
-            glm::vec3(1.0f)
+            glm::vec3(2.0f)
         );
         pyramidModel = MathUtils::buildTRS(
             glm::vec3(spacing, 1.0f, 0.0f), 
             glm::vec3(0,1,0), angle, 
-            glm::vec3(2.0f)
+            glm::vec3(4.0f)
         );
 
         renderLightGizmo(*lightGizmo, lightShader, camera, params);

@@ -9,7 +9,7 @@ in mat3 TBN;           // Receive tangent-space basis from vertex shader
 out vec4 fragColor;
 
 uniform bool useTextures = true; // Toggle texture usage
-uniform bool useNormalMap = true; // Toggle normal mapping
+uniform bool useNormalMap = false; // Toggle normal mapping
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
