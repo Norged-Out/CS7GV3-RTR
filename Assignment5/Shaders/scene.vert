@@ -19,6 +19,7 @@ uniform mat4 camMatrix;  // proj * view
 // Imports the model matrix from the main function
 uniform mat4 model;
 
+// light projection * view matrix for shadows
 uniform mat4 lightSpaceMatrix;
 
 

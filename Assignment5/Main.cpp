@@ -29,6 +29,12 @@
 const unsigned int width = 1200;
 const unsigned int height = 800;
 
+enum class SceneShadowMode {
+    HardDepth = 0,
+    PCFDepth,
+    MSM
+};
+
 struct TweakableParams {
     // Light parameters
     float intensity = 1.0f;
@@ -40,7 +46,7 @@ struct TweakableParams {
     float orbitSpeed = 0.5f; // radians/sec
     bool useTextures = true;
     bool useNormalMap = false;
-    bool usePCF = false;
+    SceneShadowMode shadowMode = SceneShadowMode::HardDepth;
 };
 
 // -------------------- GUI Setup --------------------
@@ -60,13 +66,18 @@ static void buildGUI(TweakableParams& params, ShadowMap& shadowMap) {
     ImGui::Separator();
     ImGui::Checkbox("Use Textures", &params.useTextures);
     ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
-    ImGui::Checkbox("Use PCF Shadows", &params.usePCF);
+
+    // Switch between the three shadowing techniques we want to compare.
+    const char* shadowModeLabels[] = { "Hard Depth", "PCF Depth", "MSM" };
+    int shadowModeIndex = static_cast<int>(params.shadowMode);
+    ImGui::Combo("Shadow Mode", &shadowModeIndex, shadowModeLabels, IM_ARRAYSIZE(shadowModeLabels));
+    params.shadowMode = static_cast<SceneShadowMode>(shadowModeIndex);
 
     ImGui::Separator();
     ImGui::Text("Shadow Map Debug");
 
     ImGui::Image(
-        (ImTextureID)(uintptr_t)shadowMap.getDepthTexture(),
+        (ImTextureID)(uintptr_t)shadowMap.getDebugTexture(),
         ImVec2(256,256),
         ImVec2(0,1),
         ImVec2(1,0)
@@ -107,7 +118,7 @@ static void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakablePara
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
-    shader.setBool("usePCF", params.usePCF);
+    shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
 
     mesh.Draw(shader);
 }
@@ -152,7 +163,7 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
-    shader.setBool("usePCF", params.usePCF);
+    shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
 
     model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
     model.Draw(shader);
@@ -167,6 +178,7 @@ static void renderShadowPass(ShadowMap& shadowMap, Shader& shadowShader,
     Mesh& pyramid, const glm::mat4& pyramidModel,
     Model& spaceRobot, Model& penguinBot) {
     shadowShader.Activate();
+    shadowShader.setInt("shadowMode", static_cast<int>(shadowMap.getMode()));
     shadowMap.applyUniforms(shadowShader);
 
     glDisable(GL_CULL_FACE);
@@ -322,6 +334,13 @@ int main() {
 
         beginFrame(params, shadowMap);
 
+        // Keep the shadow resource type matched to the selected scene shadow mode.
+        if (params.shadowMode == SceneShadowMode::MSM) {
+            shadowMap.setMode(ShadowMode::MSM);
+        } else {
+            shadowMap.setMode(ShadowMode::Depth);
+        }
+
         // Build model matrices
         pyramidModel = MathUtils::buildTRS(glm::vec3(-4.5f, 0.45f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(2.0f));
         sphereModel = MathUtils::buildTRS(glm::vec3(0.0f, 0.55f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(1.25f));
@@ -360,6 +379,7 @@ int main() {
 
         sceneShader.Activate();
         shadowMap.applyUniforms(sceneShader);
+        shadowMap.BindTexture(5);
         
         renderMesh(*cube, sceneShader, camera, params, cubeModel);
         renderMesh(*sphere, sceneShader, camera, params, sphereModel);

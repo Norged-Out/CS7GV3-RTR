@@ -5,20 +5,20 @@ in vec3 normalWS;	   // Receive world space normal
 in vec3 vertexColor;   // Receive color from vertex shader
 in vec2 texCoord;      // Receive texture coordinates from vertex shader
 in mat3 TBN;           // Receive tangent-space basis from vertex shader
-in vec4 lightSpacePos;
+in vec4 lightSpacePos; // Receive light-space position from vertex shader
 
-out vec4 fragColor;
+out vec4 fragColor; // Final shaded color output
 
 uniform bool useTextures = false; // Toggle texture usage
 uniform bool useNormalMap = false; // Toggle normal mapping
-uniform bool usePCF = false;
+uniform int shadowMode = 0; // 0 = hard depth, 1 = PCF depth, 2 = MSM
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
 uniform sampler2D roughness0; // texture unit for roughness
-uniform sampler2D shadowMap;
+uniform sampler2D shadowMap; // shadow map / shadow texture input
 
-uniform float uvScale = 1.0;
+uniform float uvScale = 1.0; // UV tiling multiplier for material textures
 
 uniform vec4 lightColor; // Gets the color of the light
 uniform vec3 lightDir;   // Direction the light travels in world space
@@ -92,6 +92,106 @@ float computeShadowPCF(vec3 geomNormal, vec3 L) {
     return shadow;
 }
 
+vec4 getBiasedMoments(vec2 uv) {
+    // Sample the 4 stored moments
+    const float alpha = 3e-5; // fallback
+    vec4 moments = texture(shadowMap, uv);
+    return mix(moments, vec4(0.5), alpha);
+}
+
+vec3 solveMomentSystem(vec4 moments, float zf) {
+    // Build small matrix from the 4 moments
+    float diag0 = 1.0;
+    float lower10 = moments.x / diag0;
+    float lower20 = moments.y / diag0;
+
+    // Factor the matrix
+    float diag1 = max(moments.y - lower10 * lower10 * diag0, 1e-6);
+    float lower21 = (moments.z - lower20 * lower10 * diag0) / diag1;
+
+    // last diagonal term
+    float diag2 = max(moments.w - lower20 * lower20 * diag0 - lower21 * lower21 * diag1, 1e-6);
+
+    // Build rhs from the current fragment depth
+    vec3 rhs = vec3(1.0, zf, zf * zf);
+
+    // Forward solve
+    vec3 y;
+    y.x = rhs.x;
+    y.y = rhs.y - lower10 * y.x;
+    y.z = rhs.z - lower20 * y.x - lower21 * y.y;
+
+    // Diagonal solve
+    vec3 z;
+    z.x = y.x / diag0;
+    z.y = y.y / diag1;
+    z.z = y.z / diag2;
+
+    // Back solve to get the quadratic coefficients
+    vec3 c;
+    c.z = z.z;
+    c.y = z.y - lower21 * c.z;
+    c.x = z.x - lower10 * c.y - lower20 * c.z;
+    return c;
+}
+
+float computeShadowMSM() {
+    vec3 projCoords = getShadowProjCoords();
+
+    // Skip fragments outside the light frustum
+    if(projCoords.z > 1.0) return 0.0;
+    if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
+       projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
+
+    // Read current fragment depth
+    float zf = projCoords.z;
+
+    // Read filtered moments for this sample
+    vec4 moments = getBiasedMoments(projCoords.xy);
+
+    // Solve for the quadratic coefficients
+    vec3 c = solveMomentSystem(moments, zf);
+    float quadA = c.z;
+    float quadB = c.y;
+    float quadC = c.x;
+
+    // If the quadratic collapses, treat fragment as lit
+    if (abs(quadA) < 1e-6) return 0.0;
+
+    // Solve the quadratic and get the two split depths
+    float discriminant = max(quadB * quadB - 4.0 * quadA * quadC, 0.0);
+    float sqrtDisc = sqrt(discriminant);
+    float inverseTwoA = 0.5 / quadA;
+
+    float firstRoot = (-quadB - sqrtDisc) * inverseTwoA;
+    float secondRoot = (-quadB + sqrtDisc) * inverseTwoA;
+    if (firstRoot > secondRoot) {
+        float temp = firstRoot;
+        firstRoot = secondRoot;
+        secondRoot = temp;
+    }
+
+    // Use the paper's piecewise visibility formulas
+    float shadow = 0.0;
+    if (zf <= firstRoot) {
+        shadow = 0.0;
+    } else if (zf <= secondRoot) {
+        float denom = (secondRoot - firstRoot) * (zf - firstRoot);
+        if (abs(denom) > 1e-6) {
+            shadow = (zf * secondRoot - moments.x * (zf + secondRoot) + moments.y) / denom;
+        }
+    } else {
+        float denom = (zf - firstRoot) * (zf - secondRoot);
+        if (abs(denom) > 1e-6) {
+            shadow = 1.0 - (firstRoot * secondRoot - moments.x * (firstRoot + secondRoot) + moments.y) / denom;
+        } else {
+            shadow = 1.0;
+        }
+    }
+
+    return clamp(shadow, 0.0, 1.0);
+}
+
 
 void main() {
     // Normal selection 
@@ -139,8 +239,15 @@ void main() {
     float spec = pow(max(dot(N, H), 0.0), shininess);
     float specular = spec * specularStr * smoothness;
 
-
-    float shadow = usePCF ? computeShadowPCF(geomNormal, L) : computeShadowHard(geomNormal, L);
+    // Shadow-map computation
+    float shadow = 0.0;
+    if (shadowMode == 2) {
+        shadow = computeShadowMSM();
+    } else if (shadowMode == 1) {
+        shadow = computeShadowPCF(geomNormal, L);
+    } else {
+        shadow = computeShadowHard(geomNormal, L);
+    }
     
     // Combine
     vec3 result = baseColor * ambient;

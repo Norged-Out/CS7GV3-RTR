@@ -1,0 +1,73 @@
+shadow progress
+
+1. what ShadowMap.* does
+
+The ShadowMap class is basically the manager for my current shadow system.
+
+Right now it:
+- creates the shadow framebuffer
+- creates the depth texture for the shadow map
+- sets up the light-space matrix for a directional light
+- begins the shadow pass
+- ends the shadow pass
+- lets the main scene shader sample the shadow texture later
+
+So in short, ShadowMap is the thing that owns the shadow-map resources and handles the light view/projection setup.
+
+
+2. what the shaders do
+
+shadow.vert:
+- sends geometry into light space during the shadow pass
+
+shadow.frag:
+- does basically nothing right now
+- the GPU just writes depth automatically into the depth texture
+
+scene.vert:
+- sends world position, normal, UVs, tangent basis, and light-space position to the fragment shader
+
+scene.frag:
+- does the actual lighting
+- samples textures
+- handles optional normal mapping
+- samples the shadow map
+- does either hard shadows or PCF shadows
+
+
+3. how I did baseline shadow maps
+
+For the baseline version, I render the scene twice.
+
+First pass:
+- render from the light's point of view
+- store only depth in the shadow map
+
+Second pass:
+- render the scene normally from the camera
+- convert each fragment into light space
+- compare its depth against the depth stored in the shadow map
+
+If the fragment is farther than the stored depth, it is in shadow.
+If not, it is lit.
+
+That is my current hard-shadow baseline.
+
+
+4. how I did PCF shadow maps
+
+After the baseline worked, I added PCF.
+
+Instead of checking the shadow map once, I sample a small 3x3 area around the current shadow-map coordinate.
+Then I average those results.
+
+So:
+- hard shadows = one compare
+- PCF shadows = a bunch of nearby compares averaged together
+
+This makes the edges softer and less jagged.
+
+Important thing I learned:
+- PCF helps soften edges
+- PCF does not really fix shadow acne
+- bias handling is what matters more for that
