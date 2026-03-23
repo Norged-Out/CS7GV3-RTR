@@ -7,3 +7,6 @@
 [submodule "Assignment4/OpenGL_Engine"]
 	path = Assignment4/OpenGL_Engine
 	url = https://github.com/Norged-Out/OpenGL_Engine.git
+[submodule "Assignment5/OpenGL_Engine"]
+	path = Assignment5/OpenGL_Engine
+	url = https://github.com/Norged-Out/OpenGL_Engine.git

@@ -44,7 +44,7 @@ struct TweakableParams {
     bool orbitLight = false;
     float orbitRadius = 5.0f;
     float orbitSpeed = 0.5f; // radians/sec
-    bool useTextures = true;
+    bool useTextures = false;
     bool useNormalMap = false;
     SceneShadowMode shadowMode = SceneShadowMode::HardDepth;
 };
