@@ -67,7 +67,7 @@ static void buildGUI(TweakableParams& params, ShadowMap& shadowMap) {
     ImGui::Checkbox("Use Textures", &params.useTextures);
     ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
 
-    // Switch between the three shadowing techniques we want to compare.
+    // Switch between the three shadowing techniques
     const char* shadowModeLabels[] = { "Hard Depth", "PCF Depth", "MSM" };
     int shadowModeIndex = static_cast<int>(params.shadowMode);
     ImGui::Combo("Shadow Mode", &shadowModeIndex, shadowModeLabels, IM_ARRAYSIZE(shadowModeLabels));
@@ -172,14 +172,14 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
 
 // -------------------- Shadow Mapping --------------------
 
-static void renderShadowPass(ShadowMap& shadowMap, Shader& shadowShader,
+static void renderShadowPass(ShadowMap& shadowMap,
     Mesh& cube, const glm::mat4& cubeModel,
     Mesh& sphere, const glm::mat4& sphereModel,
     Mesh& pyramid, const glm::mat4& pyramidModel,
     Model& spaceRobot, Model& penguinBot) {
-    shadowShader.Activate();
-    shadowShader.setInt("shadowMode", static_cast<int>(shadowMap.getMode()));
-    shadowMap.applyUniforms(shadowShader);
+    // Activate the engine-owned shadow shader and push the shared pass uniforms
+    shadowMap.bindPassShader();
+    Shader& shadowShader = shadowMap.getPassShader();
 
     glDisable(GL_CULL_FACE);
     shadowMap.Begin();
@@ -250,12 +250,10 @@ int main() {
     std::cout << "Loading shaders..." << std::endl;
     Shader sceneShader("Shaders/scene.vert", "Shaders/scene.frag");
     Shader lightShader("Shaders/light.vert", "Shaders/light.frag");
-    Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
 
     // ------------ Shadow Map Logic ------------
 
     ShadowMap shadowMap(2048, 2048);
-    Shader shadowShader("Shaders/shadow.vert", "Shaders/shadow.frag");    
 
     // ------------ Setup Meshes ------------
 
@@ -334,7 +332,6 @@ int main() {
 
         beginFrame(params, shadowMap);
 
-        // Keep the shadow resource type matched to the selected scene shadow mode.
         if (params.shadowMode == SceneShadowMode::MSM) {
             shadowMap.setMode(ShadowMode::MSM);
         } else {
@@ -363,7 +360,7 @@ int main() {
             40.0f    // far
         );
 
-        renderShadowPass(shadowMap, shadowShader,
+        renderShadowPass(shadowMap,
             *cube, cubeModel,
             *sphere, sphereModel,
             *pyramid, pyramidModel,
@@ -390,8 +387,7 @@ int main() {
         renderModel(penguinBot, sceneShader, camera, params, angle * 20.0f);
 
         // Render skybox last
-        skyboxShader.Activate();
-		skybox.Draw(camera, skyboxShader);
+		skybox.Draw(camera);
 
         // Render ImGui
         ImGui::Render();
@@ -409,8 +405,6 @@ int main() {
     
     sceneShader.Delete();
     lightShader.Delete();
-    skyboxShader.Delete();
-    shadowShader.Delete();
 
     shutdownImGui();
     shutdownWindow(window);

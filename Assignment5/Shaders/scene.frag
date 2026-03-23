@@ -57,7 +57,7 @@ float computeShadowHard(vec3 geomNormal, vec3 L) {
     // Depth of the current fragment from the light's perspective
     float currentDepth = projCoords.z;
 
-    // Use the geometric normal here so normal maps don't destabilize bias.
+    // Use the geometric normal here so normal maps don't destabilize bias
     float bias = computeShadowBias(geomNormal, L);
 
     // If current depth is farther than stored depth, fragment is in shadow
@@ -135,7 +135,7 @@ vec3 solveMomentSystem(vec4 moments, float zf) {
     return c;
 }
 
-float computeShadowMSM() {
+float computeShadowMSM(vec3 geomNormal, vec3 L) {
     vec3 projCoords = getShadowProjCoords();
 
     // Skip fragments outside the light frustum
@@ -143,8 +143,10 @@ float computeShadowMSM() {
     if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
        projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
-    // Read current fragment depth
-    float zf = projCoords.z;
+    float bias = computeShadowBias(geomNormal, L) * 0.5;
+
+    // Read current fragment depth after biasing it slightly toward the light.
+    float zf = max(projCoords.z - bias, 0.0);
 
     // Read filtered moments for this sample
     vec4 moments = getBiasedMoments(projCoords.xy);
@@ -242,7 +244,7 @@ void main() {
     // Shadow-map computation
     float shadow = 0.0;
     if (shadowMode == 2) {
-        shadow = computeShadowMSM();
+        shadow = computeShadowMSM(geomNormal, L);
     } else if (shadowMode == 1) {
         shadow = computeShadowPCF(geomNormal, L);
     } else {

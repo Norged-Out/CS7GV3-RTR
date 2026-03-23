@@ -2,17 +2,19 @@ shadow progress
 
 1. what ShadowMap.* does
 
-The ShadowMap class is basically the manager for my current shadow system.
+The ShadowMap class is the manager for my whole shadow setup.
 
-Right now it:
+At first it only handled normal depth shadow maps.
+Now it can handle both:
+- normal depth shadow maps
+- MSM moment shadow maps
+
+So right now it:
 - creates the shadow framebuffer
-- creates the depth texture for the shadow map
-- sets up the light-space matrix for a directional light
-- begins the shadow pass
-- ends the shadow pass
-- lets the main scene shader sample the shadow texture later
-
-So in short, ShadowMap is the thing that owns the shadow-map resources and handles the light view/projection setup.
+- creates either the depth texture or the moment texture
+- sets up the light-space matrix for the directional light
+- begins and ends the shadow pass
+- lets the scene shader sample the correct shadow texture later
 
 
 2. what the shaders do
@@ -21,8 +23,9 @@ shadow.vert:
 - sends geometry into light space during the shadow pass
 
 shadow.frag:
-- does basically nothing right now
-- the GPU just writes depth automatically into the depth texture
+- in normal depth mode, it basically lets the usual shadow depth happen
+- in MSM mode, it writes 4 depth moments:
+  z, z^2, z^3, z^4
 
 scene.vert:
 - sends world position, normal, UVs, tangent basis, and light-space position to the fragment shader
@@ -31,8 +34,10 @@ scene.frag:
 - does the actual lighting
 - samples textures
 - handles optional normal mapping
-- samples the shadow map
-- does either hard shadows or PCF shadows
+- now supports 3 shadow paths:
+  - hard depth shadows
+  - PCF depth shadows
+  - MSM shadows
 
 
 3. how I did baseline shadow maps
@@ -51,7 +56,7 @@ Second pass:
 If the fragment is farther than the stored depth, it is in shadow.
 If not, it is lit.
 
-That is my current hard-shadow baseline.
+That is my hard-shadow baseline.
 
 
 4. how I did PCF shadow maps
@@ -67,7 +72,57 @@ So:
 
 This makes the edges softer and less jagged.
 
-Important thing I learned:
+Big thing I learned:
 - PCF helps soften edges
 - PCF does not really fix shadow acne
 - bias handling is what matters more for that
+
+
+5. how I did MSM
+
+For MSM, I changed the shadow system so it can store 4 depth moments instead of just one depth value.
+
+In the MSM shadow pass:
+- I store:
+  - z
+  - z^2
+  - z^3
+  - z^4
+
+Then in the lighting pass:
+- I sample those 4 values
+- run the MSM reconstruction math
+- get back a shadow intensity
+
+So instead of asking:
+- "am I behind one stored depth value?"
+
+MSM is more like:
+- "based on these 4 stored depth statistics, how shadowed should I be?"
+
+
+6. what I fixed to make MSM usable
+
+The first MSM version worked, but it still had visible acne / weirdness.
+
+So I cleaned up a few important things:
+- made sure MSM uses the real fragment depth when writing moments
+- kept the paper's small moment bias for stability
+- added a small practical receiver bias for MSM too
+- clamped the final shadow value
+- made sure the moment texture uses filtering
+
+After that, the acne basically went away and MSM started looking much more believable.
+
+
+7. what the three modes look like now
+
+Hard:
+- sharp shadow edge
+
+PCF:
+- blurry / softened edge from averaging nearby samples
+
+MSM:
+- still solid and dark where it should be
+- but the transition feels smoother and more natural
