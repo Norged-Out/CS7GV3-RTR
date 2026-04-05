@@ -42,11 +42,15 @@ struct TweakableParams {
     glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
     float ambient = 0.25f;
     bool orbitLight = false;
+    bool pauseRotation = false;
     float orbitRadius = 5.0f;
     float orbitSpeed = 0.5f; // radians/sec
     bool useTextures = false;
     bool useNormalMap = false;
     SceneShadowMode shadowMode = SceneShadowMode::HardDepth;
+    float msmMomentBias = 3e-5f;
+    float msmReceiverBiasScale = 0.5f;
+    float msmOverdarkening = 0.0f;
 };
 
 // -------------------- GUI Setup --------------------
@@ -60,6 +64,7 @@ static void buildGUI(TweakableParams& params, ShadowMap& shadowMap) {
 
     ImGui::Separator();
     ImGui::Checkbox("Orbit Light", &params.orbitLight);
+    ImGui::Checkbox("Pause Rotation", &params.pauseRotation);
     ImGui::SliderFloat("Orbit Radius", &params.orbitRadius, 1.0f, 10.0f);
     ImGui::SliderFloat("Orbit Speed", &params.orbitSpeed, 0.1f, 1.0f);
 
@@ -72,6 +77,14 @@ static void buildGUI(TweakableParams& params, ShadowMap& shadowMap) {
     int shadowModeIndex = static_cast<int>(params.shadowMode);
     ImGui::Combo("Shadow Mode", &shadowModeIndex, shadowModeLabels, IM_ARRAYSIZE(shadowModeLabels));
     params.shadowMode = static_cast<SceneShadowMode>(shadowModeIndex);
+
+    if (params.shadowMode == SceneShadowMode::MSM) {
+        ImGui::Separator();
+        ImGui::Text("MSM Tuning");
+        ImGui::SliderFloat("Moment Bias", &params.msmMomentBias, 0.0f, 0.0002f, "%.7f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Receiver Bias Scale", &params.msmReceiverBiasScale, 0.0f, 2.0f);
+        ImGui::SliderFloat("Overdarkening", &params.msmOverdarkening, 0.0f, 0.1f, "%.3f");
+    }
 
     ImGui::Separator();
     ImGui::Text("Shadow Map Debug");
@@ -119,6 +132,9 @@ static void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakablePara
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
     shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
+    shader.setFloat("msmMomentBias", params.msmMomentBias);
+    shader.setFloat("msmReceiverBiasScale", params.msmReceiverBiasScale);
+    shader.setFloat("msmOverdarkening", params.msmOverdarkening);
 
     mesh.Draw(shader);
 }
@@ -164,6 +180,9 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
     shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
+    shader.setFloat("msmMomentBias", params.msmMomentBias);
+    shader.setFloat("msmReceiverBiasScale", params.msmReceiverBiasScale);
+    shader.setFloat("msmOverdarkening", params.msmOverdarkening);
 
     model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
     model.Draw(shader);
@@ -172,7 +191,7 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
 
 // -------------------- Shadow Mapping --------------------
 
-static void renderShadowPass(ShadowMap& shadowMap,
+static void renderShadowPass(ShadowMap& shadowMap, const TweakableParams& params,
     Mesh& cube, const glm::mat4& cubeModel,
     Mesh& sphere, const glm::mat4& sphereModel,
     Mesh& pyramid, const glm::mat4& pyramidModel,
@@ -328,7 +347,9 @@ int main() {
         float now = (float)glfwGetTime();
         float dt = now - prevTime;
         prevTime = now;
-        angle = now * rotationSpeed;
+        if (!params.pauseRotation) {
+            angle = now * rotationSpeed;
+        }
 
         beginFrame(params, shadowMap);
 
@@ -360,7 +381,7 @@ int main() {
             40.0f    // far
         );
 
-        renderShadowPass(shadowMap,
+        renderShadowPass(shadowMap, params,
             *cube, cubeModel,
             *sphere, sphereModel,
             *pyramid, pyramidModel,

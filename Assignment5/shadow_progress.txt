@@ -88,6 +88,7 @@ In the MSM shadow pass:
   - z^2
   - z^3
   - z^4
+- then I run a simple Gaussian blur over the moment texture
 
 Then in the lighting pass:
 - I sample those 4 values
@@ -126,3 +127,49 @@ PCF:
 MSM:
 - still solid and dark where it should be
 - but the transition feels smoother and more natural
+
+For the final demo, I cleaned the UI up instead of keeping every MSM experiment as a toggle.
+The subtle 2017-style improvements are baked in, but I kept the useful MSM bias sliders plus a Pause Rotation toggle so I can freeze the scene and still tune the parts that are actually easy to show.
+
+
+8. the actual order I did this in
+
+This part matters because the final result was not just "I added MSM and it worked".
+
+The order was more like this:
+
+1. I first got normal hard shadow mapping working.
+- It worked as a baseline, but it had acne / self-shadowing.
+
+2. Then I added PCF.
+- That made the shadow edge softer.
+- But PCF did not really fix the acne.
+
+3. Then I cleaned up the baseline shadow setup.
+- I made the renderer use directional lighting properly instead of mixing point-light style shading with directional shadows.
+- I also made the baseline bias use the real geometric normal instead of the normal-mapped one.
+- That is what made the hard and PCF versions look way cleaner.
+
+4. After that baseline cleanup, I added MSM.
+- So MSM was not the first shadow thing I did.
+- It was built on top of a cleaner baseline.
+
+5. The first MSM version worked, but still had visible issues.
+- It was more like "the pipeline exists" than "the result is polished".
+
+6. Then I improved the MSM version with the minimum practical fixes.
+- real fragment depth for moment writing
+- paper bias for moment stability
+- small MSM receiver bias
+- clamped shadow result
+- filtered moment texture
+- simple Gaussian blur on the moment map
+
+7. After those MSM fixes, the acne pretty much disappeared and MSM started looking like a more proper shadow.
+
+So the actual methodology was:
+- hard shadows first
+- PCF second
+- baseline acne cleanup third
+- MSM implementation fourth
+- MSM stabilization fifth
