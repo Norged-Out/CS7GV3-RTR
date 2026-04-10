@@ -9,6 +9,7 @@
 #include <engine/MathUtils.h>
 #include <engine/Geometry.h>
 #include <engine/ShadowMap.h>
+#include "ShadowLabUI.h"
 
 // skybox
 #include <engine/HDRTexture.h>
@@ -23,87 +24,19 @@
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <algorithm>
+#include <chrono>
 
 // -------------------- Establish globals --------------------
 
 const unsigned int width = 1200;
 const unsigned int height = 800;
-
-enum class SceneShadowMode {
-    HardDepth = 0,
-    PCFDepth,
-    MSM
-};
-
-struct TweakableParams {
-    // Light parameters
-    float intensity = 1.0f;
-    glm::vec3 position = glm::vec3(0.0f, 3.0f, 3.0f);
-    glm::vec4 color = glm::vec4(1.0f, 0.97f, 0.92f, 1.0f);
-    float ambient = 0.25f;
-    bool orbitLight = false;
-    bool pauseRotation = false;
-    float orbitRadius = 5.0f;
-    float orbitSpeed = 0.5f; // radians/sec
-    bool useTextures = false;
-    bool useNormalMap = false;
-    SceneShadowMode shadowMode = SceneShadowMode::HardDepth;
-    float msmMomentBias = 3e-5f;
-    float msmReceiverBiasScale = 0.5f;
-    float msmOverdarkening = 0.0f;
-};
-
-// -------------------- GUI Setup --------------------
-
-static void buildGUI(TweakableParams& params, ShadowMap& shadowMap) {
-    ImGui::Begin("Rotations Controls");
-    ImGui::SliderFloat("Light Intensity", &params.intensity, 0.5f, 5.0f);
-    ImGui::SliderFloat("Ambient", &params.ambient, 0.0f, 1.0f);
-    ImGui::ColorEdit3("Light Color", &params.color.r);
-    ImGui::DragFloat3("Light Position", &params.position.x, 0.1f);
-
-    ImGui::Separator();
-    ImGui::Checkbox("Orbit Light", &params.orbitLight);
-    ImGui::Checkbox("Pause Rotation", &params.pauseRotation);
-    ImGui::SliderFloat("Orbit Radius", &params.orbitRadius, 1.0f, 10.0f);
-    ImGui::SliderFloat("Orbit Speed", &params.orbitSpeed, 0.1f, 1.0f);
-
-    ImGui::Separator();
-    ImGui::Checkbox("Use Textures", &params.useTextures);
-    ImGui::Checkbox("Use Normal Map", &params.useNormalMap);
-
-    // Switch between the three shadowing techniques
-    const char* shadowModeLabels[] = { "Hard Depth", "PCF Depth", "MSM" };
-    int shadowModeIndex = static_cast<int>(params.shadowMode);
-    ImGui::Combo("Shadow Mode", &shadowModeIndex, shadowModeLabels, IM_ARRAYSIZE(shadowModeLabels));
-    params.shadowMode = static_cast<SceneShadowMode>(shadowModeIndex);
-
-    if (params.shadowMode == SceneShadowMode::MSM) {
-        ImGui::Separator();
-        ImGui::Text("MSM Tuning");
-        ImGui::SliderFloat("Moment Bias", &params.msmMomentBias, 0.0f, 0.0002f, "%.7f", ImGuiSliderFlags_Logarithmic);
-        ImGui::SliderFloat("Receiver Bias Scale", &params.msmReceiverBiasScale, 0.0f, 2.0f);
-        ImGui::SliderFloat("Overdarkening", &params.msmOverdarkening, 0.0f, 0.1f, "%.3f");
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Shadow Map Debug");
-
-    ImGui::Image(
-        (ImTextureID)(uintptr_t)shadowMap.getDebugTexture(),
-        ImVec2(256,256),
-        ImVec2(0,1),
-        ImVec2(1,0)
-    );
-
-    ImGui::End();
-}
-
-static void beginFrame(TweakableParams& params, ShadowMap& shadowMap) {
+static void beginFrame(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics,
+    std::array<MetricSnapshot, 3>& snapshots) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    buildGUI(params, shadowMap);
+    buildShadowLabUI(params, shadowMap, metrics, snapshots);
 
     glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -131,10 +64,15 @@ static void renderMesh(Mesh& mesh, Shader& shader, Camera& camera, TweakablePara
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
+    shader.setBool("useSignedMSMDepth", params.useSignedMSMDepth);
+    shader.setBool("useImprovedMSMBiasTarget", params.useImprovedMSMBiasTarget);
     shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
+    shader.setInt("pcfRadius", params.pcfRadius);
     shader.setFloat("msmMomentBias", params.msmMomentBias);
     shader.setFloat("msmReceiverBiasScale", params.msmReceiverBiasScale);
     shader.setFloat("msmOverdarkening", params.msmOverdarkening);
+    shader.setFloat("shadowBiasSlope", params.shadowBiasSlope);
+    shader.setFloat("shadowBiasMin", params.shadowBiasMin);
 
     mesh.Draw(shader);
 }
@@ -179,10 +117,15 @@ static void renderModel(Model& model, Shader& shader, Camera& camera,
     // Toggles
     shader.setBool("useTextures", params.useTextures);
     shader.setBool("useNormalMap", params.useNormalMap);
+    shader.setBool("useSignedMSMDepth", params.useSignedMSMDepth);
+    shader.setBool("useImprovedMSMBiasTarget", params.useImprovedMSMBiasTarget);
     shader.setInt("shadowMode", static_cast<int>(params.shadowMode));
+    shader.setInt("pcfRadius", params.pcfRadius);
     shader.setFloat("msmMomentBias", params.msmMomentBias);
     shader.setFloat("msmReceiverBiasScale", params.msmReceiverBiasScale);
     shader.setFloat("msmOverdarkening", params.msmOverdarkening);
+    shader.setFloat("shadowBiasSlope", params.shadowBiasSlope);
+    shader.setFloat("shadowBiasMin", params.shadowBiasMin);
 
     model.setRotation(angle, glm::vec3(0.0f, 1.0f, 0.0f));
     model.Draw(shader);
@@ -310,8 +253,6 @@ int main() {
     pyramid->setMaterial(rockMat);
     plane->setMaterial(beachMat);
 
-    float xSpacing = 3.8f;
-    float zSpacing = 3.8f;
     glm::mat4 cubeModel(1.0f);
     glm::mat4 sphereModel(1.0f);
     glm::mat4 pyramidModel(1.0f);
@@ -334,6 +275,8 @@ int main() {
     // ------------ Render Loop ------------
 
     TweakableParams params;
+    RuntimeMetrics metrics;
+    std::array<MetricSnapshot, 3> metricSnapshots{};
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = true;
     glm::vec3 target(0.0f, 0.0f, 0.0f);
@@ -344,6 +287,7 @@ int main() {
 	std::cout << "Entering render loop..." << std::endl;
     // this loop will run until we close window
     while (!glfwWindowShouldClose(window)) {
+        auto frameStart = std::chrono::high_resolution_clock::now();
         float now = (float)glfwGetTime();
         float dt = now - prevTime;
         prevTime = now;
@@ -351,13 +295,17 @@ int main() {
             angle = now * rotationSpeed;
         }
 
-        beginFrame(params, shadowMap);
+        beginFrame(params, shadowMap, metrics, metricSnapshots);
 
         if (params.shadowMode == SceneShadowMode::MSM) {
             shadowMap.setMode(ShadowMode::MSM);
         } else {
             shadowMap.setMode(ShadowMode::Depth);
         }
+        shadowMap.resize(params.shadowResolution, params.shadowResolution);
+        shadowMap.setUseSignedDepth(params.useSignedMSMDepth);
+        shadowMap.setBlurEnabled(params.useMSMBlur);
+        shadowMap.setBlurScale(params.blurScale);
 
         // Build model matrices
         pyramidModel = MathUtils::buildTRS(glm::vec3(-4.5f, 0.45f, 0.0f), glm::vec3(0,1,0), angle, glm::vec3(2.0f));
@@ -376,17 +324,21 @@ int main() {
 
         shadowMap.setDirectionalLight(
             lightDir,
-            12.0f,   // orthographic size
-            1.0f,    // near
-            40.0f    // far
+            params.shadowOrthoSize,
+            params.shadowNearPlane,
+            params.shadowFarPlane
         );
 
+        auto shadowStart = std::chrono::high_resolution_clock::now();
         renderShadowPass(shadowMap, params,
             *cube, cubeModel,
             *sphere, sphereModel,
             *pyramid, pyramidModel,
             spaceRobot, penguinBot
         );
+        auto shadowEnd = std::chrono::high_resolution_clock::now();
+        metrics.shadowPassMs = std::chrono::duration<float, std::milli>(shadowEnd - shadowStart).count();
+        metrics.blurMs = static_cast<float>(shadowMap.getLastBlurMs());
 
         // restore window viewport
         int fbWidth, fbHeight;
@@ -420,6 +372,16 @@ int main() {
         glfwSwapBuffers(window);
         // take care of all GLFW events
         glfwPollEvents();
+
+        auto frameEnd = std::chrono::high_resolution_clock::now();
+        float frameMs = std::chrono::duration<float, std::milli>(frameEnd - frameStart).count();
+        float fps = frameMs > 0.0f ? 1000.0f / frameMs : 0.0f;
+        metrics.averageFrameMs = metrics.averageFrameMs == 0.0f
+            ? frameMs
+            : metrics.averageFrameMs * 0.9f + frameMs * 0.1f;
+        metrics.averageFps = metrics.averageFps == 0.0f
+            ? fps
+            : metrics.averageFps * 0.9f + fps * 0.1f;
     }
 
     // ------------ Clean up ------------

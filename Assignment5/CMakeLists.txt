@@ -3,7 +3,10 @@ project(Testing)
 set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(OpenGL_Engine)
-add_executable(app Main.cpp)
+add_executable(app
+    Main.cpp
+    ShadowLabUI.cpp
+)
 target_link_libraries(app PRIVATE engine)
 
 target_compile_definitions(app PRIVATE

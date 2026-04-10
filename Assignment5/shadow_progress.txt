@@ -129,7 +129,19 @@ MSM:
 - but the transition feels smoother and more natural
 
 For the final demo, I cleaned the UI up instead of keeping every MSM experiment as a toggle.
-The subtle 2017-style improvements are baked in, but I kept the useful MSM bias sliders plus a Pause Rotation toggle so I can freeze the scene and still tune the parts that are actually easy to show.
+Later on, I expanded the UI again because the report needed more controlled comparisons.
+
+So right now the shadow UI can also show:
+- baseline bias presets and sliders
+- PCF radius
+- shadow-map resolution
+- raw / legacy / current MSM presets
+- signed depth on/off
+- improved bias target on/off
+- blur on/off plus blur scale
+- live metrics like FPS, frame time, shadow pass time, blur time, and estimated shadow memory
+
+This makes the project less like a fixed demo and more like a little shadow-comparison lab.
 
 
 8. the actual order I did this in

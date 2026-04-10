@@ -11,7 +11,10 @@ out vec4 fragColor; // Final shaded color output
 
 uniform bool useTextures = false; // Toggle texture usage
 uniform bool useNormalMap = false; // Toggle normal mapping
+uniform bool useSignedMSMDepth = true; // Toggle the MSM depth convention for comparison
+uniform bool useImprovedMSMBiasTarget = true; // Toggle the 2017-style fallback target
 uniform int shadowMode = 0; // 0 = hard depth, 1 = PCF depth, 2 = MSM
+uniform int pcfRadius = 1; // Radius of the PCF sampling kernel
 
 uniform sampler2D diffuse0; // texture unit for diffuse
 uniform sampler2D normal0; // normal map
@@ -28,6 +31,11 @@ uniform float ambient; // Ambient strength
 uniform float specularStr = 2.5f; // Specular strength
 uniform float roughnessBias = 0.0f; // Bias to adjust roughness
 uniform float normalStrength = 1.0f; // Strength of normal mapping
+uniform float msmMomentBias = 3e-5f; // Strength of the MSM moment stabilization bias
+uniform float msmReceiverBiasScale = 0.5f; // Extra receiver-side MSM bias scale
+uniform float msmOverdarkening = 0.0f; // Small extra darkening to suppress faint light leaks
+uniform float shadowBiasSlope = 0.01f; // Scale factor for slope-sensitive depth bias
+uniform float shadowBiasMin = 0.001f; // Minimum baseline depth bias
 
 vec3 getShadowProjCoords() {
     // Convert clip-space position to normalized device coordinates
@@ -40,7 +48,7 @@ vec3 getShadowProjCoords() {
 
 float computeShadowBias(vec3 geomNormal, vec3 L) {
     float ndotl = max(dot(normalize(geomNormal), normalize(L)), 0.0);
-    return max(0.01 * (1.0 - ndotl), 0.001);
+    return max(shadowBiasSlope * (1.0 - ndotl), shadowBiasMin);
 }
 
 float computeShadowHard(vec3 geomNormal, vec3 L) {
@@ -80,23 +88,38 @@ float computeShadowPCF(vec3 geomNormal, vec3 L) {
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
     float shadow = 0.0;
 
-    // 3x3 kernel sampling
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
+    // Sample a configurable kernel so UI controls can show softness vs cost
+    for(int x = -pcfRadius; x <= pcfRadius; ++x) {
+        for(int y = -pcfRadius; y <= pcfRadius; ++y) {
             float closestDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
             shadow += currentDepth - bias > closestDepth ? 1.0 : 0.0;
         }
     }
-    shadow /= 9.0;
+    float kernelWidth = float(pcfRadius * 2 + 1);
+    shadow /= kernelWidth * kernelWidth;
 
     return shadow;
 }
 
 vec4 getBiasedMoments(vec2 uv) {
     // Sample the 4 stored moments
-    const float alpha = 3e-5; // fallback
     vec4 moments = texture(shadowMap, uv);
-    return mix(moments, vec4(0.5), alpha);
+
+    // The old paper-style target is simple, while the 2017 target is more robust.
+    vec4 legacySignedBiasTarget = vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 legacyUnsignedBiasTarget = vec4(0.5, 0.5, 0.5, 0.5);
+
+    // Use the 2017-style fallback target for signed depth in [-1,1]
+    vec4 improvedBiasTarget = vec4(0.0, 0.375, 0.0, 0.375);
+
+    // Pick the bias target based on the active experiment controls
+    vec4 biasTarget = useSignedMSMDepth ? legacySignedBiasTarget : legacyUnsignedBiasTarget;
+    if (useImprovedMSMBiasTarget && useSignedMSMDepth) {
+        biasTarget = improvedBiasTarget;
+    }
+
+    // Nudge the sampled moments slightly toward a safer valid moment set.
+    return mix(moments, biasTarget, msmMomentBias);
 }
 
 vec3 solveMomentSystem(vec4 moments, float zf) {
@@ -143,10 +166,16 @@ float computeShadowMSM(vec3 geomNormal, vec3 L) {
     if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
        projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
 
-    float bias = computeShadowBias(geomNormal, L) * 0.5;
+    float bias = computeShadowBias(geomNormal, L) * msmReceiverBiasScale;
 
-    // Read current fragment depth after biasing it slightly toward the light.
-    float zf = max(projCoords.z - bias, 0.0);
+    // Build the fragment depth in the same convention used when the moments were written
+    float zf = projCoords.z;
+    if (useSignedMSMDepth) {
+        zf = zf * 2.0 - 1.0;
+        zf = clamp(zf - bias * 2.0, -1.0, 1.0);
+    } else {
+        zf = clamp(zf - bias, 0.0, 1.0);
+    }
 
     // Read filtered moments for this sample
     vec4 moments = getBiasedMoments(projCoords.xy);
@@ -191,6 +220,8 @@ float computeShadowMSM(vec3 geomNormal, vec3 L) {
         }
     }
 
+    // Slightly darken the result to hide faint light leaks, then clamp it back to a sane range.
+    shadow = shadow / max(1.0 - msmOverdarkening, 1e-6);
     return clamp(shadow, 0.0, 1.0);
 }
 
