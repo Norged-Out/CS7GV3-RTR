@@ -1,0 +1,31 @@
+\section{Improvements and Limitations}
+
+\subsection{What Was Improved}
+
+Compared to the original baseline, the final renderer includes several improvements that made the comparison stronger:
+\begin{itemize}
+    \item a cleaner directional-light pipeline,
+    \item reduced acne in the baseline hard and PCF modes,
+    \item a reusable \texttt{ShadowMap} system supporting both depth and MSM resources,
+    \item a functioning MSM path with practical stabilisation,
+    \item Gaussian filtering of the moment map,
+    \item comparison-oriented runtime controls and metric capture support.
+\end{itemize}
+
+\subsection{What Remains Limited}
+
+Despite those improvements, the implementation still has clear limitations:
+\begin{itemize}
+    \item it is not a full paper-complete reproduction of the 2015 method,
+    \item it does not yet include a deeper quantitative evaluation section with many repeated trials,
+    \item the current timing metrics are CPU-side measurements rather than full GPU timing queries,
+    \item some of the 2017 paper was left out, especially the broader treatment of robustness and filtering.
+\end{itemize}
+
+The most important limitation is scope. The project reached the point where the three shadowing modes could be compared fairly, but it was not pushed into a full reproduction of every idea from both papers. The focus stayed on getting one strong baseline, one standard filtered baseline, and one working MSM implementation inside the same renderer.
+
+\subsection{Scope of the 2017 Paper Additions}
+
+The 2017 paper was used mainly as a source of practical robustness improvements rather than as a second full implementation target. In this project, the parts that were actually carried over were signed depth and an improved bias target. Those changes helped make the MSM path more stable, but they were not dramatic enough to turn this into a separate ``Improved MSM'' implementation.
+
+Other parts of the 2017 paper were left out. In particular, the project did not attempt a fuller implementation of the paper's filtering refinements, stronger treatment of light leaking, or the broader set of improvements discussed there. For that reason, the most accurate way to describe the final result is still as a stabilised 2015-style MSM implementation with a small number of 2017-inspired additions.

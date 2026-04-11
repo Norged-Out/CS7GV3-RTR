@@ -31,12 +31,11 @@
 
 const unsigned int width = 1200;
 const unsigned int height = 800;
-static void beginFrame(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics,
-    std::array<MetricSnapshot, 3>& snapshots) {
+static void beginFrame(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    buildShadowLabUI(params, shadowMap, metrics, snapshots);
+    buildShadowLabUI(params, shadowMap, metrics);
 
     glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -276,7 +275,6 @@ int main() {
 
     TweakableParams params;
     RuntimeMetrics metrics;
-    std::array<MetricSnapshot, 3> metricSnapshots{};
     float prevTime = (float)glfwGetTime();
 	bool pWasDown = true;
     glm::vec3 target(0.0f, 0.0f, 0.0f);
@@ -295,7 +293,7 @@ int main() {
             angle = now * rotationSpeed;
         }
 
-        beginFrame(params, shadowMap, metrics, metricSnapshots);
+        beginFrame(params, shadowMap, metrics);
 
         if (params.shadowMode == SceneShadowMode::MSM) {
             shadowMap.setMode(ShadowMode::MSM);

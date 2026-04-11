@@ -1,5 +1,6 @@
 #include "ShadowLabUI.h"
 
+#include <array>
 #include <fstream>
 #include <iomanip>
 #include <imgui.h>
@@ -25,45 +26,48 @@ static void captureSnapshot(MetricSnapshot& snapshot, const TweakableParams& par
     snapshot.metrics = metrics;
 }
 
-// Dump the captured slots into a simple CSV file for later report analysis.
-static bool exportSnapshotsToCsv(const std::array<MetricSnapshot, 3>& snapshots) {
-    std::ofstream file("shadow_metrics.csv", std::ios::trunc);
+// Append one captured snapshot into a simple CSV file for later report analysis.
+static bool exportSnapshotToCsv(const MetricSnapshot& shot) {
+    const char* csvPath = "C:/Users/Pri/Documents/GitHub/CS7GV3-RTR/Assignment5/shadow_metrics.csv";
+
+    bool needsHeader = true;
+    {
+        std::ifstream existingFile(csvPath);
+        needsHeader = !existingFile.good() || existingFile.peek() == std::ifstream::traits_type::eof();
+    }
+
+    std::ofstream file(csvPath, std::ios::app);
     if (!file.is_open()) {
         return false;
     }
 
-    file << "slot,mode,resolution,avg_fps,avg_frame_ms,shadow_pass_ms,blur_pass_ms,shadow_memory_mb,pcf_radius,"
-            "signed_depth,improved_bias_target,blur_enabled,blur_scale,bias_slope,bias_min,moment_bias,"
-            "receiver_bias_scale,overdarkening\n";
+    if (needsHeader) {
+        file << "slot,mode,resolution,avg_fps,avg_frame_ms,shadow_pass_ms,blur_pass_ms,shadow_memory_mb,pcf_radius,"
+                "signed_depth,improved_bias_target,blur_enabled,blur_scale,bias_slope,bias_min,moment_bias,"
+                "receiver_bias_scale,overdarkening\n";
+    }
 
     file << std::fixed << std::setprecision(4);
 
-    for (size_t i = 0; i < snapshots.size(); ++i) {
-        const MetricSnapshot& shot = snapshots[i];
-        if (!shot.captured) {
-            continue;
-        }
-
-        file
-            << (i + 1) << ','
-            << getShadowModeLabel(shot.shadowMode) << ','
-            << shot.shadowResolution << ','
-            << shot.metrics.averageFps << ','
-            << shot.metrics.averageFrameMs << ','
-            << shot.metrics.shadowPassMs << ','
-            << shot.metrics.blurMs << ','
-            << shot.shadowMemoryMb << ','
-            << shot.pcfRadius << ','
-            << (shot.useSignedMSMDepth ? 1 : 0) << ','
-            << (shot.useImprovedMSMBiasTarget ? 1 : 0) << ','
-            << (shot.useMSMBlur ? 1 : 0) << ','
-            << shot.blurScale << ','
-            << shot.shadowBiasSlope << ','
-            << shot.shadowBiasMin << ','
-            << shot.msmMomentBias << ','
-            << shot.msmReceiverBiasScale << ','
-            << shot.msmOverdarkening << '\n';
-    }
+    file
+        << 1 << ','
+        << getShadowModeLabel(shot.shadowMode) << ','
+        << shot.shadowResolution << ','
+        << shot.metrics.averageFps << ','
+        << shot.metrics.averageFrameMs << ','
+        << shot.metrics.shadowPassMs << ','
+        << shot.metrics.blurMs << ','
+        << shot.shadowMemoryMb << ','
+        << shot.pcfRadius << ','
+        << (shot.useSignedMSMDepth ? 1 : 0) << ','
+        << (shot.useImprovedMSMBiasTarget ? 1 : 0) << ','
+        << (shot.useMSMBlur ? 1 : 0) << ','
+        << shot.blurScale << ','
+        << shot.shadowBiasSlope << ','
+        << shot.shadowBiasMin << ','
+        << shot.msmMomentBias << ','
+        << shot.msmReceiverBiasScale << ','
+        << shot.msmOverdarkening << '\n';
 
     return true;
 }
@@ -99,14 +103,6 @@ void applyMSMPreset(TweakableParams& params, const std::string& presetName) {
         params.msmReceiverBiasScale = 0.0f;
         params.msmOverdarkening = 0.0f;
         params.blurScale = 1.0f;
-    } else if (presetName == "Legacy") {
-        params.useSignedMSMDepth = false;
-        params.useImprovedMSMBiasTarget = false;
-        params.useMSMBlur = false;
-        params.msmMomentBias = 3e-5f;
-        params.msmReceiverBiasScale = 0.0f;
-        params.msmOverdarkening = 0.0f;
-        params.blurScale = 1.0f;
     } else {
         params.useSignedMSMDepth = true;
         params.useImprovedMSMBiasTarget = true;
@@ -118,8 +114,7 @@ void applyMSMPreset(TweakableParams& params, const std::string& presetName) {
     }
 }
 
-void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics,
-    std::array<MetricSnapshot, 3>& snapshots) {
+void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics) {
     ImGui::Begin("Rotations Controls");
 
     // General scene and lighting controls stay visible regardless of shadow mode.
@@ -192,8 +187,6 @@ void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const Runti
         ImGui::CollapsingHeader("MSM Controls", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::Button("Raw MSM")) applyMSMPreset(params, "Raw");
         ImGui::SameLine();
-        if (ImGui::Button("Legacy MSM")) applyMSMPreset(params, "Legacy");
-        ImGui::SameLine();
         if (ImGui::Button("Current MSM")) applyMSMPreset(params, "Current");
 
         ImGui::Checkbox("Use Signed Depth", &params.useSignedMSMDepth);
@@ -215,64 +208,16 @@ void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const Runti
         ImGui::Text("Shadow Memory: %.2f MB", shadowMap.getApproxMemoryBytes() / (1024.0f * 1024.0f));
     }
 
-    // Capture slots make it easier to record stable values for the report.
+    // Write the current settings plus averaged metrics directly into the CSV.
     if (ImGui::CollapsingHeader("Capture Metrics", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::TextWrapped("Freeze the scene, wait a moment for the averages to settle, then capture a slot.");
-        if (ImGui::Button("Export Captures to CSV")) {
-            exportSnapshotsToCsv(snapshots);
+        ImGui::TextWrapped("Freeze the scene, wait a moment for the averages to settle, then append one capture to the CSV.");
+        if (ImGui::Button("Capture Current Metrics to CSV")) {
+            MetricSnapshot shot{};
+            captureSnapshot(shot, params, metrics, shadowMap);
+            exportSnapshotToCsv(shot);
         }
-        ImGui::Text("Output file: shadow_metrics.csv");
-
-        for (int i = 0; i < 3; ++i) {
-            std::string captureLabel = "Capture Slot " + std::to_string(i + 1);
-            if (ImGui::Button(captureLabel.c_str())) {
-                captureSnapshot(snapshots[i], params, metrics, shadowMap);
-            }
-            ImGui::SameLine();
-            std::string clearLabel = "Clear##" + std::to_string(i + 1);
-            if (ImGui::Button(clearLabel.c_str())) {
-                snapshots[i] = MetricSnapshot{};
-            }
-
-            if (snapshots[i].captured) {
-                const MetricSnapshot& shot = snapshots[i];
-                ImGui::Text("Slot %d: %s | %d | Avg FPS %.1f | Avg ms %.3f",
-                    i + 1,
-                    getShadowModeLabel(shot.shadowMode),
-                    shot.shadowResolution,
-                    shot.metrics.averageFps,
-                    shot.metrics.averageFrameMs
-                );
-                ImGui::Text("  Shadow %.3f ms | Blur %.3f ms | Memory %.2f MB",
-                    shot.metrics.shadowPassMs,
-                    shot.metrics.blurMs,
-                    shot.shadowMemoryMb
-                );
-                if (shot.shadowMode == SceneShadowMode::PCFDepth) {
-                    ImGui::Text("  PCF radius: %d", shot.pcfRadius);
-                }
-                if (shot.shadowMode == SceneShadowMode::MSM) {
-                    ImGui::Text("  Signed: %s | Bias target: %s | Blur: %s (%.2f)",
-                        shot.useSignedMSMDepth ? "On" : "Off",
-                        shot.useImprovedMSMBiasTarget ? "Improved" : "Legacy",
-                        shot.useMSMBlur ? "On" : "Off",
-                        shot.blurScale
-                    );
-                    ImGui::Text("  Moment %.7f | Receiver %.3f | Overdarkening %.3f",
-                        shot.msmMomentBias,
-                        shot.msmReceiverBiasScale,
-                        shot.msmOverdarkening
-                    );
-                } else {
-                    ImGui::Text("  Bias slope %.4f | Bias min %.5f",
-                        shot.shadowBiasSlope,
-                        shot.shadowBiasMin
-                    );
-                }
-            } else {
-                ImGui::Text("Slot %d: empty", i + 1);
-            }
-        }
+        ImGui::Text("Output file: Assignment5/shadow_metrics.csv");
+        ImGui::TextWrapped("Each click appends one row using the current averaged metrics and active settings.");
     }
 
     // The debug preview always shows the active shadow resource.

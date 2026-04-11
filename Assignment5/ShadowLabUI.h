@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <string>
 
 #include <glm/glm.hpp>
@@ -78,5 +77,4 @@ struct MetricSnapshot {
 const char* getShadowModeLabel(SceneShadowMode mode);
 void applyBaselineBiasPreset(TweakableParams& params, const std::string& presetName);
 void applyMSMPreset(TweakableParams& params, const std::string& presetName);
-void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics,
-    std::array<MetricSnapshot, 3>& snapshots);
+void buildShadowLabUI(TweakableParams& params, ShadowMap& shadowMap, const RuntimeMetrics& metrics);

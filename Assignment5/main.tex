@@ -1,0 +1,58 @@
+\documentclass[12pt,a4paper]{article}
+
+% -----------------------------
+% Packages
+% -----------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage[backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+\graphicspath{{figures/}}
+\setstretch{1.05}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\AtBeginBibliography{\small}
+
+% -----------------------------
+% Title
+% -----------------------------
+\title{CS7GV3 -- Real-Time Rendering\\Assignment 5: Moment Shadow Maps}
+\author{Priyansh Nayak \\ Student ID: 25350660}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\linewidth]{\detokenize{MSM Full.png}}
+    \caption{Final renderer output with the stabilised MSM pipeline enabled.}
+    \label{fig:msm_hero}
+\end{figure}
+
+\input{sections/background}
+\input{sections/implementation}
+\input{sections/evaluation}
+\input{sections/improvements_limitations}
+\input{sections/conclusion}
+
+\printbibliography
+
+\end{document}

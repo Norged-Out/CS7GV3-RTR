@@ -1,0 +1,127 @@
+\section{Results and Evaluation}
+
+The evaluation compares the three shadowing modes under the same scene, camera, and light setup:
+\begin{itemize}
+    \item Hard depth shadows,
+    \item PCF depth shadows,
+    \item MSM with the final stabilisation steps enabled.
+\end{itemize}
+
+All measurements were captured at a shadow resolution of $2048 \times 2048$. The renderer exposes the active parameters directly in the UI and writes the averaged metrics to CSV, which made it possible to keep the conditions consistent across captures.
+
+\subsection{Performance and Resource Comparison}
+
+The main recorded metrics were average FPS, average frame time, shadow-pass time, blur-pass time, shadow resolution, and approximate shadow memory usage. These are enough to compare the three modes directly without overloading the evaluation with less useful numbers.
+
+Table \ref{tab:performance} shows the main comparison between the baseline Hard mode, the default PCF mode, a wider PCF kernel, and the final MSM mode. The clearest result is that Hard and PCF run at almost identical speed in the current scene, while MSM is substantially more expensive. This is expected: the MSM path uses a four-channel floating-point moment texture, extra reconstruction work in the lighting shader, and a two-pass Gaussian blur.
+
+\begin{table}[H]
+    \centering
+    \caption{Measured performance and resource comparison across the main shadow modes.}
+    \label{tab:performance}
+    \begin{tabular}{lcccccc}
+        \toprule
+        Mode & Resolution & Avg FPS & Avg ms & Shadow ms & Blur ms & Memory (MB) \\
+        \midrule
+        Hard & 2048 & 164.0 & 6.114 & 0.104 & --    & 16 \\
+        PCF ($r=1$) & 2048 & 164.1 & 6.113 & 0.067 & --    & 16 \\
+        PCF ($r=4$) & 2048 & 163.9 & 6.114 & 0.099 & --    & 16 \\
+        MSM (final) & 2048 & 67.1 & 14.962 & 0.064 & 0.011 & 144 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+In other words, MSM gave the best final visual result, but it also consumed the most memory and had the highest frame cost. PCF stayed close to the baseline in runtime cost, even when the kernel radius was increased from 1 to 4.
+
+\subsection{Qualitative Comparison}
+
+The qualitative comparison focused on:
+\begin{itemize}
+    \item shadow edge sharpness,
+    \item softness of the transition region,
+    \item visible acne or self-shadowing,
+    \item light leaking,
+    \item stability under motion.
+\end{itemize}
+
+% Centered crop used to focus the comparison figures on the shadow region.
+\newcommand{\shadowcomparecrop}[1]{%
+    \includegraphics[width=\linewidth,trim=260 40 260 40,clip]{#1}%
+}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{Hard Depth.png}}
+        \caption{Hard}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{PCF Rad 1.png}}
+        \caption{PCF ($r=1$)}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{MSM.png}}
+        \caption{MSM}
+    \end{subfigure}
+    \caption{Close-up comparison of Hard, PCF, and MSM.}
+    \label{fig:qualitative_compare}
+\end{figure}
+
+The screenshots match the expected behaviour of the three techniques. Hard shadows produce the strictest edge and the clearest depth-test look. PCF softens that edge, but still behaves like a filtered version of ordinary depth shadow mapping. MSM produces the smoothest and most natural-looking transition while keeping the shadow visually solid. This became much clearer once the stabilisation steps were added.
+
+\subsection{MSM Ablation}
+
+\begin{table}[H]
+    \centering
+    \caption{Ablation-style measurements for the MSM pipeline.}
+    \label{tab:msm_ablation}
+    \begin{tabular}{lccccc}
+        \toprule
+        Variant & Avg FPS & Avg ms & Blur ms & Signed & Improved Bias \\
+        \midrule
+        Raw MSM & 163.0 & 6.164 & --    & Off & Off \\
+        No signed depth & 71.7 & 13.968 & 0.013 & Off & On \\
+        No improved bias & 67.5 & 14.905 & 0.013 & On & Off \\
+        No blur & 164.3 & 6.111 & --    & On & On \\
+        Final MSM & 67.1 & 14.962 & 0.011 & On & On \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Table \ref{tab:msm_ablation} helps separate the visual and runtime roles of the MSM improvements. Disabling blur almost restored the frame time to baseline levels, which shows that the filtered moment map is the main extra cost in the final MSM path. The signed-depth and improved-bias-target changes were much more subtle visually, but they were still worth keeping because they improved stability and made the renderer easier to work with.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{MSM (Raw).png}}
+        \caption{Raw}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{MSM (no blur).png}}
+        \caption{No blur}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.31\linewidth}
+        \centering
+        \shadowcomparecrop{\detokenize{MSM.png}}
+        \caption{Final}
+    \end{subfigure}
+    \caption{MSM ablation: raw, no blur, and final.}
+    \label{fig:msm_ablation}
+\end{figure}
+
+The main points from the evaluation are:
+\begin{itemize}
+    \item MSM was the most expensive mode in both frame time and shadow memory.
+    \item The Gaussian blur was a necessary part of the final MSM quality, but also an important extra cost.
+    \item PCF remained very competitive in runtime cost, especially at small kernel sizes.
+    \item MSM gave the strongest visual result, but only after practical stabilisation.
+\end{itemize}
