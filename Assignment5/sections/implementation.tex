@@ -2,79 +2,34 @@
 
 \subsection{Project Structure and Engine Context}
 
-The implementation was built on top of a reusable OpenGL engine rather than as a one-off coursework scene. This mattered because the shadow system needed to stay modular enough to support later work. The core reusable engine systems relevant to this assignment are:
-\begin{itemize}
-    \item \texttt{Shader} for OpenGL program compilation and uniform uploads,
-    \item \texttt{Mesh}, \texttt{Material}, and \texttt{Model} for geometry and asset rendering,
-    \item \texttt{Skybox} for environment rendering,
-    \item \texttt{ShadowMap} for the shadow framebuffer, shadow resources, and shadow-pass shader ownership.
-\end{itemize}
+The implementation was built on top of my reusable OpenGL engine \cite{openglengine} rather than as a one-off coursework scene. This mattered for the assignment because the task was not only to reproduce a paper result, but to integrate the technique into an existing real-time renderer in a way that could be demonstrated, compared, and reused. The engine already provided the surrounding systems needed for this, including shader management, geometry and material handling, model loading through Assimp \cite{assimp}, texture loading through stb \cite{stb}, skybox rendering, and a CMake-based structure that could be reused across projects.
 
-The application layer then provides the scene layout, mode switching, experiment UI, and comparison tooling.
+Using that codebase changed the shape of the work. Instead of treating hard shadows, PCF, and MSM as isolated scene-specific features, the shadow work was folded into the renderer itself. In practice, this meant extending the engine-side \texttt{ShadowMap} system while keeping the application layer responsible for scene layout, runtime controls, and evaluation captures. This also made the final comparison more meaningful, since all three modes were running inside the same renderer under the same scene and asset setup.
+
+The application layer then provides the scene layout, mode switching, experiment UI, and comparison tooling, with windowing and input handled through GLFW \cite{glfw}, OpenGL loading through GLAD \cite{glad}, maths through GLM \cite{glm}, and the comparison UI through Dear ImGui \cite{imgui}.
 
 \subsection{Baseline Directional Shadow Mapping}
 
 The renderer first implemented a standard directional shadow map. In this baseline path, the scene is rendered from the light's point of view into a depth texture. The visible scene is then rendered from the camera, and each fragment is transformed into light space so that its shadow-space depth can be compared against the stored depth texture.
 
-This gave a working starting point, but it also showed the expected baseline problems. The early version had visible shadow acne and self-shadowing. Before MSM could be compared fairly, the baseline had to be cleaned up. The main fixes were:
-\begin{itemize}
-    \item making the renderer consistently directional-light based,
-    \item using the geometric normal rather than the normal-mapped normal for baseline biasing,
-    \item exposing baseline bias values as configurable parameters.
-\end{itemize}
+This gave a working starting point, but it also showed the expected baseline problems. The early version had visible shadow acne and self-shadowing. Before MSM could be compared fairly, the baseline had to be cleaned up. In practice, this meant making the renderer consistently directional-light based, using the geometric normal rather than the normal-mapped normal for baseline biasing, and exposing the baseline bias values as configurable parameters.
 
 \subsection{PCF Depth Shadows}
 
-After the baseline depth shadow map was working, PCF was added as the first filtered comparison method. The PCF path still uses the same depth shadow map, but instead of comparing only a single texel, it samples a small neighbourhood around the current coordinate and averages the results. In the current implementation, the PCF radius can be changed at runtime so that quality and cost can be compared as the number of depth comparisons increases.
-
-PCF improved the harshness of the edge, but it did not solve acne by itself. In practice, it worked best as a filtered baseline rather than as a full solution to the usual shadow-map artifacts.
+After the baseline depth shadow map was working, PCF was added as the first filtered comparison method. The PCF path still uses the same depth shadow map, but instead of comparing only a single texel, it samples a small neighbourhood around the current coordinate and averages the results. In the current implementation, the PCF radius can be changed at runtime so that quality and cost can be compared as the number of depth comparisons increases. PCF improved the harshness of the edge, but it did not solve acne by itself. In practice, it worked best as a filtered baseline rather than as a full solution to the usual shadow-map artifacts.
 
 \subsection{Moment Shadow Mapping}
 
-The \texttt{ShadowMap} system was then generalized from a depth-only helper into a reusable subsystem with two modes:
-\begin{itemize}
-    \item \texttt{Depth} mode for the baseline hard and PCF paths,
-    \item \texttt{MSM} mode for moment shadow mapping.
-\end{itemize}
-
-In MSM mode, the shadow pass writes four moments of depth:
+The \texttt{ShadowMap} system was then generalized from a depth-only helper into a reusable subsystem with two modes: \texttt{Depth} for the baseline hard and PCF paths, and \texttt{MSM} for moment shadow mapping. In MSM mode, the shadow pass writes four moments of depth:
 \[
 z,\; z^2,\; z^3,\; z^4
 \]
-These are stored in an RGBA floating-point moment texture. The scene shader later samples this texture and reconstructs a shadow intensity using an MSM reconstruction path based on the 2015 paper structure.
+These are stored in an RGBA floating-point moment texture. The scene shader later samples this texture and reconstructs a shadow intensity using an MSM reconstruction path based on the 2015 paper structure \cite{peters2015msm}.
 
 \subsection{MSM Stabilisation and Practical Improvements}
 
-The first MSM implementation worked structurally, but it did not immediately produce a clean final result. The following stabilisation steps were introduced:
-\begin{itemize}
-    \item consistent use of rasterized fragment depth when writing moments,
-    \item moment bias for numerical stability,
-    \item receiver bias to reduce self-shadowing,
-    \item clamping of the final reconstructed shadow value,
-    \item signed-depth support for MSM,
-    \item an improved fallback bias target inspired by the 2017 paper,
-    \item a built-in two-pass Gaussian blur over the moment texture.
-\end{itemize}
-
-Not all of these changes produced dramatic visual differences. Some were mainly there for robustness, but together they were important in making MSM stable enough for a fair comparison.
+The first MSM implementation worked structurally, but it did not immediately produce a clean final result. The stabilisation work included using rasterized fragment depth when writing moments, adding moment bias for numerical stability, adding receiver bias to reduce self-shadowing, clamping the final reconstructed value, enabling signed-depth support, switching to an improved fallback bias target inspired by the 2017 paper \cite{peters2017improved}, and adding a built-in two-pass Gaussian blur over the moment texture. Not all of these changes produced dramatic visual differences. Some were mainly there for robustness, but together they were important in making MSM stable enough for a fair comparison.
 
 \subsection{Scene, UI, and Comparison Workflow}
 
-The final scene contains both procedural and imported content:
-\begin{itemize}
-    \item a cube, sphere, and pyramid generated through the custom geometry system,
-    \item a space robot model and a penguin model,
-    \item a textured plane and skybox.
-\end{itemize}
-
-The application also includes a report-oriented UI. This exposes the parameters needed for controlled experiments:
-\begin{itemize}
-    \item mode switching between Hard, PCF, and MSM,
-    \item shadow resolution and frustum controls,
-    \item baseline bias controls,
-    \item PCF kernel radius,
-    \item MSM presets and bias parameters,
-    \item CSV export for recording measurements.
-\end{itemize}
-
-This turns the application into a small comparison tool rather than just a visual demo.
+The final scene contains both procedural and imported content. It uses a cube, sphere, and pyramid generated through the custom geometry system, together with a space robot model \cite{sketchfab_space_robot}, a penguin model \cite{sketchfab_penguin}, a textured plane using Poly Haven materials \cite{polyhaven_beach,polyhaven_brick,polyhaven_rock,polyhaven_wood}, and a skybox based on a Poly Haven HDR environment \cite{polyhaven_skybox}. The application also includes a UI for controlled comparison. Through that UI, it is possible to switch between Hard, PCF, and MSM, change the shadow resolution and frustum settings, adjust the baseline and MSM bias values, vary the PCF radius, and export measurements to CSV for later evaluation, which made it possible to compare the modes under fixed conditions instead of relying only on casual visual judgement.

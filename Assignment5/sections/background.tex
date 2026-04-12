@@ -2,15 +2,8 @@
 
 Moment Shadow Mapping (MSM) was introduced by Peters and Klein as a filtered shadowing technique that stores several moments of shadow-space depth instead of one raw depth value \cite{peters2015msm}. Standard shadow mapping stores one depth sample per texel and later compares the current fragment depth against that value. This gives a simple baseline, but it is sensitive to biasing issues and does not respond well when the shadow map is filtered directly.
 
-The key idea of MSM is to replace the single stored depth with a small set of depth moments. These moments give a compact description of the local depth distribution. In practice, the shadow pass writes the moments into an RGBA texture, the texture is filtered, and the scene shader reconstructs a shadow intensity from the filtered data. Compared to ordinary hard depth tests or PCF, MSM is meant to support smoother and more stable shadow transitions while still being practical for real-time rendering \cite{peters2015msm}.
+The key idea of MSM is to replace the single stored depth with a small set of depth moments that give a compact description of the local depth distribution. In practice, the shadow pass writes the moments into an RGBA texture, the texture is filtered, and the scene shader reconstructs a shadow intensity from the filtered data. Compared to ordinary hard depth tests or PCF, MSM is meant to support smoother and more stable shadow transitions while still being practical for real-time rendering \cite{peters2015msm}.
 
-The follow-up 2017 paper, \textit{Improved Moment Shadow Maps}, revisits the original method and focuses on robustness improvements such as better depth conventions, improved bias targets, and more stable handling of filtered moments \cite{peters2017improved}. In this project, the 2015 method is the main target. A small number of 2017-inspired ideas were added where they improved stability, but the work is still mainly a 2015-style MSM implementation.
+The follow-up 2017 paper, \textit{Improved Moment Shadow Maps}, revisits the original method and focuses on robustness improvements such as better depth conventions, improved bias targets, and more stable handling of filtered moments \cite{peters2017improved}. In this project, the implementation still mainly follows the 2015 method \cite{peters2015msm}, with only a small number of 2017-inspired additions where they improved stability \cite{peters2017improved}.
 
-For this assignment, the paper background matters for two reasons. First, it shows why MSM is more than ``soft shadows with extra blur''; the method is specifically about filtering moment data and reconstructing visibility from it. Second, it gives a clear comparison structure:
-\begin{itemize}
-    \item hard depth shadows as the baseline,
-    \item PCF as the common filtered-depth baseline,
-    \item MSM as the more advanced research-based shadowing method.
-\end{itemize}
-
-This project therefore works well as both a rendering feature and a controlled comparison between these three approaches.
+For this assignment, the paper background matters for two reasons. First, it shows why MSM is more than ``soft shadows with extra blur''; the method is specifically about filtering moment data and reconstructing visibility from it. Second, it gives a clear comparison structure, with hard depth shadows as the baseline, PCF as the common filtered-depth baseline, and MSM as the more advanced research-based method.

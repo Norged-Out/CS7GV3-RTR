@@ -14,18 +14,18 @@ Compared to the original baseline, the final renderer includes several improveme
 
 \subsection{What Remains Limited}
 
-Despite those improvements, the implementation still has clear limitations:
+The final result is in a good place for the assignment, but it still has clear limits:
 \begin{itemize}
-    \item it is not a full paper-complete reproduction of the 2015 method,
-    \item it does not yet include a deeper quantitative evaluation section with many repeated trials,
+    \item it is not a full paper-complete reproduction of the 2015 method \cite{peters2015msm},
+    \item the evaluation is useful, but still fairly small in scale,
     \item the current timing metrics are CPU-side measurements rather than full GPU timing queries,
-    \item some of the 2017 paper was left out, especially the broader treatment of robustness and filtering.
+    \item some of the 2017 paper was left out, especially the broader treatment of robustness, filtering, and storage \cite{peters2017improved}.
 \end{itemize}
 
-The most important limitation is scope. The project reached the point where the three shadowing modes could be compared fairly, but it was not pushed into a full reproduction of every idea from both papers. The focus stayed on getting one strong baseline, one standard filtered baseline, and one working MSM implementation inside the same renderer.
+The main limitation is scope. The project reached the point where Hard, PCF, and MSM could be compared fairly inside the same renderer, but it was not pushed into a full reproduction of every idea from both papers. The focus stayed on getting one strong baseline, one standard filtered baseline, and one working MSM implementation that could actually be demonstrated and measured.
 
 \subsection{Scope of the 2017 Paper Additions}
 
-The 2017 paper was used mainly as a source of practical robustness improvements rather than as a second full implementation target. In this project, the parts that were actually carried over were signed depth and an improved bias target. Those changes helped make the MSM path more stable, but they were not dramatic enough to turn this into a separate ``Improved MSM'' implementation.
+The 2017 paper was used mainly as a source of practical robustness improvements rather than as a second full implementation target \cite{peters2017improved}. In this project, the parts that were actually carried over were signed depth, an improved bias target, and a small over-darkening control for suppressing faint light leaking. These changes helped make the MSM path more stable, but they were not dramatic enough to turn this into a separate ``Improved MSM'' implementation.
 
-Other parts of the 2017 paper were left out. In particular, the project did not attempt a fuller implementation of the paper's filtering refinements, stronger treatment of light leaking, or the broader set of improvements discussed there. For that reason, the most accurate way to describe the final result is still as a stabilised 2015-style MSM implementation with a small number of 2017-inspired additions.
+Other parts of the 2017 paper \cite{peters2017improved} were left out. In particular, the project did not attempt the paper's more complete treatment of improved filtering behaviour, stronger handling of light leaking, or its work on storage and quantisation. The report also does not claim any of the extended ideas from that paper, such as six-moment extensions or the more advanced translucency-oriented results discussed there. For that reason, the most accurate description of the final result is still a stabilised 2015-style MSM implementation \cite{peters2015msm} with a small number of 2017-inspired additions.

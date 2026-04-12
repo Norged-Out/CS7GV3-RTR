@@ -1,7 +1,7 @@
 \section{Conclusion}
 
-This project achieved a reusable engine implementation of hard shadows, PCF, and a working 2015-style MSM pipeline. The most important outcome was not simply adding MSM, but building a fair comparison by first fixing the baseline shadow setup and then integrating MSM on top of that cleaner foundation.
+This project achieved a reusable engine implementation of hard shadows, PCF, and a working 2015-style MSM pipeline \cite{peters2015msm}. The most important outcome was not simply adding MSM, but building a fair comparison by first fixing the baseline shadow setup and then integrating MSM on top of that cleaner foundation.
 
-The implementation matches the core idea of the 2015 paper: storing four moments of depth, filtering the moment data, and reconstructing the final shadow value in the lighting pass. At the same time, the project remains a practical renderer implementation rather than a full paper-complete reproduction. Some of the 2017 paper's robustness ideas were adopted where they improved stability, but the work should still be presented primarily as a stabilised 2015 MSM implementation.
+The implementation matches the core idea of the 2015 paper \cite{peters2015msm}: storing four moments of depth, filtering the moment data, and reconstructing the final shadow value in the lighting pass. At the same time, the project remains a practical renderer implementation rather than a full paper-complete reproduction. Some of the 2017 paper's robustness ideas \cite{peters2017improved} were adopted where they improved stability, but the work should still be presented primarily as a stabilised 2015 MSM implementation \cite{peters2015msm}.
 
-The final result is fairly clear. Hard shadows provide the baseline, PCF softens edges through repeated depth comparisons, and MSM gives the most natural transition after stabilisation, but at a higher and measurable cost.
+Hard shadows provide the baseline, PCF softens edges through repeated depth comparisons, and MSM gives the most natural transition after stabilisation, but at a higher and measurable cost.

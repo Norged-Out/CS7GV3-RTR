@@ -1,19 +1,12 @@
 \section{Results and Evaluation}
 
-The evaluation compares the three shadowing modes under the same scene, camera, and light setup:
-\begin{itemize}
-    \item Hard depth shadows,
-    \item PCF depth shadows,
-    \item MSM with the final stabilisation steps enabled.
-\end{itemize}
-
-All measurements were captured at a shadow resolution of $2048 \times 2048$. The renderer exposes the active parameters directly in the UI and writes the averaged metrics to CSV, which made it possible to keep the conditions consistent across captures.
+The evaluation compares hard depth shadows, PCF depth shadows, and MSM with the final stabilisation steps enabled under the same scene, camera, and light setup. All measurements were captured at a shadow resolution of $2048 \times 2048$. The renderer exposes the active parameters directly in the UI and writes the averaged metrics to CSV, which made it possible to keep the conditions consistent across captures.
 
 \subsection{Performance and Resource Comparison}
 
-The main recorded metrics were average FPS, average frame time, shadow-pass time, blur-pass time, shadow resolution, and approximate shadow memory usage. These are enough to compare the three modes directly without overloading the evaluation with less useful numbers.
+The main recorded metrics were average FPS, average frame time, shadow-pass time, blur-pass time, shadow resolution, and approximate shadow memory usage, which are enough to compare the three modes directly without overloading the evaluation with less useful numbers.
 
-Table \ref{tab:performance} shows the main comparison between the baseline Hard mode, the default PCF mode, a wider PCF kernel, and the final MSM mode. The clearest result is that Hard and PCF run at almost identical speed in the current scene, while MSM is substantially more expensive. This is expected: the MSM path uses a four-channel floating-point moment texture, extra reconstruction work in the lighting shader, and a two-pass Gaussian blur.
+Table \ref{tab:performance} shows the main comparison between the baseline Hard mode, the default PCF mode, a wider PCF kernel, and the final MSM mode. The clearest result is that Hard and PCF run at almost identical speed in the current scene, while MSM is substantially more expensive, which is expected because the MSM path uses a four-channel floating-point moment texture, extra reconstruction work in the lighting shader, and a two-pass Gaussian blur.
 
 \begin{table}[H]
     \centering
@@ -31,18 +24,7 @@ Table \ref{tab:performance} shows the main comparison between the baseline Hard 
     \end{tabular}
 \end{table}
 
-In other words, MSM gave the best final visual result, but it also consumed the most memory and had the highest frame cost. PCF stayed close to the baseline in runtime cost, even when the kernel radius was increased from 1 to 4.
-
-\subsection{Qualitative Comparison}
-
-The qualitative comparison focused on:
-\begin{itemize}
-    \item shadow edge sharpness,
-    \item softness of the transition region,
-    \item visible acne or self-shadowing,
-    \item light leaking,
-    \item stability under motion.
-\end{itemize}
+MSM gave the best final visual result, but it also consumed the most memory and had the highest frame cost. PCF stayed close to the baseline in runtime cost, even when the kernel radius was increased from 1 to 4, which shows that the visual gain from MSM does come with a measurable trade-off rather than being a free improvement.
 
 % Centered crop used to focus the comparison figures on the shadow region.
 \newcommand{\shadowcomparecrop}[1]{%
@@ -72,7 +54,9 @@ The qualitative comparison focused on:
     \label{fig:qualitative_compare}
 \end{figure}
 
-The screenshots match the expected behaviour of the three techniques. Hard shadows produce the strictest edge and the clearest depth-test look. PCF softens that edge, but still behaves like a filtered version of ordinary depth shadow mapping. MSM produces the smoothest and most natural-looking transition while keeping the shadow visually solid. This became much clearer once the stabilisation steps were added.
+\subsection{Qualitative Comparison}
+
+The qualitative comparison focused on shadow edge sharpness, softness of the transition region, visible acne or self-shadowing, light leaking, and stability under motion. Figure \ref{fig:qualitative_compare} shows the clearest visual difference between the three techniques. Hard shadows produce the strictest edge and the clearest depth-test look, but they also come from the baseline path that originally showed the most obvious acne and self-shadowing before cleanup. PCF softens that edge, but still behaves like a filtered version of ordinary depth shadow mapping. In the close-up comparison, the change from Hard to PCF is mainly visible at the shadow boundary, while the change from PCF to MSM is visible in the way the transition becomes smoother without looking washed out. MSM therefore gives the most natural-looking transition while keeping the shadow visually solid. This became much clearer once the stabilisation steps were added.
 
 \subsection{MSM Ablation}
 
@@ -120,8 +104,7 @@ Table \ref{tab:msm_ablation} helps separate the visual and runtime roles of the 
 
 The main points from the evaluation are:
 \begin{itemize}
-    \item MSM was the most expensive mode in both frame time and shadow memory.
+    \item MSM was the most expensive mode in both frame time and shadow memory, but it also gave the strongest visual result after practical stabilisation.
     \item The Gaussian blur was a necessary part of the final MSM quality, but also an important extra cost.
     \item PCF remained very competitive in runtime cost, especially at small kernel sizes.
-    \item MSM gave the strongest visual result, but only after practical stabilisation.
 \end{itemize}
